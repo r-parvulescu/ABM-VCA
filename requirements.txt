@@ -1,0 +1,11 @@
+### REQUIREMENTS ###
+
+# NB: for some reason on 0.8.7 (latest release as of Nov23,2020) when I try to batchrun with variable_params=None
+# it errors out by trying to read variable_params.items(), which won't work since it's None. Not an issue for 0.8.6
+mesa==0.8.6
+
+numpy==1.19.4
+pandas==1.1.4
+matplotlib==3.3.3
+
+natsort==7.1.0
