@@ -85,9 +85,11 @@ class Mover(Agent):
             self.model.positions[self.position].occupant["actor moved in"] = True
 
         self.position = new_position  # take your new position
-        self.log.append(self.position)  # update your log
-        # update your new position's occupant information with your details (only for non-retiring agents)
+        # if you're not retiring
         if self.position != '':
+            # update your log
+            self.log.append(self.position)
+            # update your new position's occupant information with your details
             self.model.positions[self.position].occupant = {"id": self.unique_id, "type": self.type}
 
     def unmoving_update_log(self):
