@@ -23,6 +23,33 @@ import statistics
 import numpy as np
 
 
+# POSITION MEASURES
+
+def get_actor_turnover_rate(model):
+    """
+    Get the actor turnover rate, averaged across all positions in a certain level. The per-position rate is simply the
+    number of actors who have occupied that position, divided by the total number of actor steps. A value one means that
+    there's a new actor each step, while the more the measure approaches zero the less position there is. We then
+    average these measures across all positions in a certain level.
+    """
+    turnover_per_level = {i: [] for i in range(1, model.num_levels + 1)}
+    for pos_id, position in model.positions.items():
+        lvl = int(pos_id.split("-")[0])
+        number_of_steps, number_of_actors = len(position.log), len(set(position.log))
+        turnover_rate = float(number_of_actors) / float(number_of_steps)
+        turnover_per_level[lvl].append(turnover_rate)
+    # average each list
+    for k, v in turnover_per_level.items():
+        if v:  # ignore empty lists
+            # if we're on the first five steps replace the value with None. That value always starts at 1 and drops very
+            # quickly towards zerp, this behaviour is automatic and thus uninteresting and makes for over-tall graphs
+            if model.schedule.steps < 6:
+                turnover_per_level[k] = None
+            else:
+                turnover_per_level[k] = statistics.mean(v)
+    return turnover_per_level
+
+
 # VACANCY MEASURES
 
 
@@ -60,6 +87,40 @@ def get_count_vacancies_per_step(model):
     return vac_per_level
 
 
+def get_net_vacancy_effects(model):
+    """
+    Using the vacancy move benefit-deficit matrix, calculate the per-actor-step net impact of all vacancy chains
+    initiated in that step. If e.g. we consider the benefits accruing to a change in housing (in some abstract utils)
+    then we read a matrix like
+
+    "vacancy_benefit_deficit_matrix": [[1, 2, 3, 4],
+                                        [-1, 3, 4, 5],
+                                        [-2, -1, 5, 6]],
+
+    to mean that when housing vacancies move down (and therefore people move up) some scale of unit "niceness" then
+    they have an increase in utils, and the opposite for moving to less nice housing. This matrix also suggests
+    decreasing marginal utility of housing niceness, since people lower down the niceness hierarchy gain more from
+    moving up or having a new unit built (presumably pulling people out of homelessness) than people moving within or
+    between higher levels.
+
+    Thus function calculates net benefits of vacancy movements, disaggregated by the level in which the vacancy started.
+
+    NB: I prefer to calculate this post-hoc rather than build it into the vacancy-agents as an updating function since
+        we don't always want to collect these data and I don't want to encumber the core model code.
+    """
+    effects_per_level = {i: 0 for i in range(1, model.num_levels + 1)}
+    for vacancy in model.retirees["vacancy"]:
+        entry_level = int(vacancy.log[0].split("-")[0])
+        # calcuate unit changes associated with vacancy mobility, by consulting the logs of vacancies initiated in that
+        # actor-step
+        for idx, spot in enumerate(vacancy.log):
+            if len(vacancy.log) > 1 and idx < len(vacancy.log)-1:
+                start_lvl, end_lvl = int(spot.split("-")[0]), int(vacancy.log[idx+1].split("-")[0])
+                # need to substrat 1 since the Python vac_ben_def_mat is a list of lists with zero indexing
+                effects_per_level[entry_level] += model.vac_ben_def_mat[start_lvl-1][end_lvl-1]
+    return effects_per_level
+
+
 def markov_predicted_chain_length(vacancy_transition_probability_matrix):
     """
     Test if the per-level chain length predicted by a first-order, discrete, embedded Markov-chain with absorbing
@@ -82,7 +143,7 @@ def markov_predicted_chain_length(vacancy_transition_probability_matrix):
     vector_of_ones = np.ones(number_of_levels)
     # get the predicted chain lengths, or in White's (1970) jargon, the "multiplier"
     pred_chain_lengths = np.matmul(n_matrix, vector_of_ones)
-    return pred_chain_lengths
+    return {i+1: pred_chain_lengths[i] for i in range(number_of_levels)}
 
 
 # ACTOR MEASURES
@@ -101,6 +162,64 @@ def get_actor_count(model):
 def get_average_actor_career_length(model):
     """Get the average length of the career lengths of all actors in the system' pooled and disaggregated by level."""
     return get_average_log_length(model, "actor")
+
+
+def get_time_to_promotion_from_last_level(model):
+    """
+    Get the average time to promotion for all those promoted in the last actor-step. Disaggregated by the level from
+    which you were promoted. NB: does not account for the promotion destination, just where you left from.
+    """
+    # NB: can't promote from the last level, so we ignore it
+    time_to_prom = {i: [] for i in range(1, model.num_levels)}
+
+    for agent in model.schedule.agents:
+        if agent.type == "actor":
+            log = list(filter(None, agent.log))  # get rid of empty years at the beginning
+            if len(log) > 1:  # can only look at those who had the chance to move
+                # check to see if they were promoted last turn)
+                if int(log[-2].split("-")[0]) < int(log[-1].split("-")[0]):
+                    # check how long that last spell was; reverse the log and starting from the second position look for
+                    # the first non-matching value; if you don't find a difference then you've been in the same position
+                    # since the beginning of the career except the last step, i.e. career length - 1
+                    last_lvl = int(log[-2].split("-")[0])
+                    spell_len = next((idx for idx, pos in enumerate(log[::-1][1:])
+                                     if int(pos.split("-")[0]) != last_lvl), len(log)-1)
+
+                    # update the promotion dict with the relevant value
+                    time_to_prom[last_lvl].append(spell_len)
+
+    # average each list
+    if time_to_prom:  # ignore empty dicts
+        for k, v in time_to_prom.items():
+            if v:  # ignore empty lists
+                time_to_prom[k] = statistics.mean(v)
+
+    return time_to_prom
+
+
+def get_time_to_retirement_from_last_level(model):
+    """
+    For all actors that retired in the last turn, get the average amount of time that they were in the pre-retirement
+    level before they finally lef the system. Disaggregated by level.
+    """
+
+    retire_time_per_level = {i: [] for i in range(1, model.num_levels + 1)}
+    for actor in model.retirees["actor"]:
+        log = list(filter(None, actor.log))  # get rid of empty years at the beginning
+        last_lvl = int(log[-1].split("-")[0])
+        # check how long that last spell was; reverse the log and look for the first non-matching value; if you don't
+        # find a difference then you retired out of your starting position, so last spell = career length
+        last_spell_len = next((idx for idx, pos in enumerate(log[::-1]) if int(pos.split("-")[0]) != last_lvl),
+                              len(log))
+        retire_time_per_level[last_lvl].append(last_spell_len)
+
+    # average each list
+    if retire_time_per_level:  # ignore empty dicts
+        for k, v in retire_time_per_level.items():
+            if v:  # ignore empty lists
+                retire_time_per_level[k] = statistics.mean(v)
+
+    return retire_time_per_level
 
 
 def get_percent_female_actors(model):
