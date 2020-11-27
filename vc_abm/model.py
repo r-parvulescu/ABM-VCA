@@ -7,7 +7,7 @@ Author of Python Code:
 
 from mesa import Model, time
 from mesa.datacollection import DataCollector
-from entity import Actor, Position, Vacancy
+from vc_abm.entities import Actor, Position, Vacancy
 import numpy as np
 import uuid
 import random
@@ -17,8 +17,8 @@ class VacancyChainAgentBasedModel(Model):
     """"""
 
     def __init__(self, positions_per_level, actor_retire_probs, vacancy_trans_prob_matrix, firing_schedule,
-                 growth_orders, start_percent_female, percent_female_entry_per_step, data_collector,
-                 shock_step=None, vacancy_move_period=53):
+                 growth_orders, start_percent_female, percent_female_entry_per_step, vacancy_benefit_deficit_matrix,
+                 data_collector, shock_step=0, vacancy_move_period=53):
         """
         :param positions_per_level: list of ints, of positions per level
                                     e.g. [10,20,30] == 10 positions in level 1, 20 in level 2, 30 in level 3
@@ -71,12 +71,22 @@ class VacancyChainAgentBasedModel(Model):
                                               probability of 0.7 of being female.
                                               NB: this dict must be defined for ALL actor-steps of the model
 
+        :param vacancy_benefit_deficit_matrix: changes in some unit associated with vacancy movements. E.g. this matrix
+
+                                               [[1, 2, 3, 4],
+                                                [-1, 3, 4, 5],
+                                                [-2, -1, 5, 6]]
+
+                                               refers to changes in a family's utility as it moves up or down the
+                                               "niceness" scale of housing: moves up increase utility, moves down
+                                               decrease it.
+
         :param data_collector: dict, indicating the data collector functions that harvest measures from the model.
                                Has form {"title_of_data_collector":name_of_collector_function"}.
                                NB: data collector functions live in collectors.py
 
         :param shock_step: int, an actor-step at which a shock of particular note occurs, e.g. a major system expansion.
-                           By default shock_step == None.
+                           By default shock_step == 0.
 
         :param vacancy_move_period: int, the number of model steps that we give vacancies to work their way out of the
                                     system. The classic, simplest formulation of vacancy chain analysis assumed that
@@ -95,6 +105,7 @@ class VacancyChainAgentBasedModel(Model):
         self.start_percent_fem, self.percent_fem_entry_per_step = start_percent_female, percent_female_entry_per_step
         self.act_ret_probs, self.vac_trans_prob_mat = actor_retire_probs, vacancy_trans_prob_matrix
         self.vac_trans_mat_num_cols = len(vacancy_trans_prob_matrix[0])
+        self.vac_ben_def_mat = vacancy_benefit_deficit_matrix
         self.data_collector = DataCollector(model_reporters=data_collector)
         self.shock_step, self.vac_mov_period = shock_step, vacancy_move_period
 
@@ -119,8 +130,8 @@ class VacancyChainAgentBasedModel(Model):
         if self.schedule.steps % self.vac_mov_period == 0:
             self.data_collector.collect(self)
 
-            # reset the pool of retired vacancies, so that it's fresh for the next round
-            self.retirees["vacancy"] = []
+            # reset the pool of retired vacancies and actors, so that it's fresh for the next round
+            self.retirees = {"actor": [], "vacancy": []}
 
             # reset bools indicating if position witnessed actor movement this step, so its fresh for the next round
             for pos in self.positions.values():
@@ -177,7 +188,7 @@ class VacancyChainAgentBasedModel(Model):
             # age of 10-22, since these are the equilibrium career ages per level; this way the "start" of the system
             # is smoother
             rand_age = random.choice(list(range(10, 23)))
-            new_agent.log.extend(rand_age * ["-"])
+            new_agent.log.extend(rand_age * [""])
         self.schedule.add(new_agent)
         # make that vacancy occupy the position
         new_agent.position = pos.unique_id
