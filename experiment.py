@@ -1,9 +1,7 @@
 """Top-level script form which we run the various simulation experiments."""
 
-import model
-import batchrun
-import plotter
-import collector
+from vc_abm import model, batchrun
+from data import plotter, collector, tables
 from local import out_dir
 
 # Uses White's figures on vacancy mobility in the 1922-1937 Methodist Church system (White 1970:125)
@@ -72,4 +70,4 @@ if __name__ == "__main__":
         plotter.make_time_series_figures(b_runs, out_directory, burn_in_steps=burn_in_steps,
                                          shock_step=num_start_steps_to_show, experiment_name=exp[2], stdev=True)
 
-        plotter.theoretical_observed_chain_length(fixed_params["vacancy_trans_prob_matrix"], b_runs, out_directory)
+        tables.theoretical_observed_chain_length(fixed_params["vacancy_trans_prob_matrix"], b_runs, out_directory)

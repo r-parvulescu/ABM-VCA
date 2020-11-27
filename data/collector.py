@@ -20,6 +20,7 @@ across all years
 """
 
 import statistics
+import numpy as np
 
 
 # VACANCY MEASURES
@@ -57,6 +58,31 @@ def get_count_vacancies_per_step(model):
         entry_level = int(vacancy.log[0].split("-")[0])
         vac_per_level[entry_level] += 1
     return vac_per_level
+
+
+def markov_predicted_chain_length(vacancy_transition_probability_matrix):
+    """
+    Test if the per-level chain length predicted by a first-order, discrete, embedded Markov-chain with absorbing
+    states lines up with your observed average chain length.
+
+    NB: we calculate predicted chain length, disaggregated by the level in which the chain starts, by first creating
+    the matrix N = inv(I - Q), where Q is the square submatrix of the vacancy transition matrix excluding absorbing
+    states (i.e. the retirement column), I is the identity matrix of similar dimensions, and "inv" signifies inversion.
+    To get predicted chain length according to the vacancy's starting level we take Nx1, where 1 a vector of ones.
+
+    :param vacancy_transition_probability_matrix:
+    """
+    # get the square transition probability submatrix, ignoring the absorbing states, by convention the last column
+    trans_prob_submatrix = np.array([row[:-1] for row in vacancy_transition_probability_matrix])
+    number_of_levels = len(trans_prob_submatrix)
+    identity = np.identity(number_of_levels)
+    identity_minus_trans_prob_submatrix = np.subtract(identity, trans_prob_submatrix)
+    # make the N matrix
+    n_matrix = np.linalg.inv(identity_minus_trans_prob_submatrix)
+    vector_of_ones = np.ones(number_of_levels)
+    # get the predicted chain lengths, or in White's (1970) jargon, the "multiplier"
+    pred_chain_lengths = np.matmul(n_matrix, vector_of_ones)
+    return pred_chain_lengths
 
 
 # ACTOR MEASURES
