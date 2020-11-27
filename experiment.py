@@ -1,7 +1,7 @@
 """Top-level script form which we run the various simulation experiments."""
 
 from vc_abm import model, batchrun
-from data import plotter, collector, tables
+from data import collector, timeseries, convergence
 from local import out_dir
 
 # Uses White's figures on vacancy mobility in the 1922-1937 Methodist Church system (White 1970:125)
@@ -94,8 +94,8 @@ if __name__ == "__main__":
         b_runs = batchrun.compare_with_without_shocks(simulation, variable_params, fixed_params, iterations,
                                                       total_steps, model_reporters)
 
-        plotter.make_time_series_figures(b_runs, out_directory, burn_in_steps=burn_in_steps,
-                                         shock_step=fixed_params["shock_step"], experiment_name=exp[2], stdev=True)
+        timeseries.make_time_series_figures(b_runs, out_directory, burn_in_steps=burn_in_steps,
+                                            shock_step=fixed_params["shock_step"], experiment_name=exp[2], stdev=True)
 
-        tables.make_convergence_table(b_runs, measures, out_directory, fixed_params["vacancy_trans_prob_matrix"],
-                                      burn_in_steps=burn_in_steps)
+        convergence.make_convergence_table(b_runs, measures, out_directory, fixed_params["vacancy_trans_prob_matrix"],
+                                           burn_in_steps=burn_in_steps)
