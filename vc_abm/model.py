@@ -139,7 +139,7 @@ class VacancyChainAgentBasedModel(Model):
 
         # if there are growth orders, carry them out
         if self.schedule.steps in self.growth_orders["steps"]:
-            self.grow(self.schedule.steps)
+            self.grow()
 
         # if there are firing orders, make actors step according to them
         if self.schedule.steps in self.firing_schedule["steps"]:
@@ -155,8 +155,8 @@ class VacancyChainAgentBasedModel(Model):
             pos.log.append((pos.occupant["id"], pos.occupant["type"]))
 
     # part of step
-    def grow(self, step):
-        """At specified step increase the number of positions. All new positions are vacant."""
+    def grow(self):
+        """Increase the number of positions. All new positions are vacant."""
         for lvl in range(1, self.num_levels + 1):
             # get the highest ID of current positions in this level so you can add new positions starting from there
             max_position_id_on_this_level = max([int(pos.split("-")[1]) for pos in self.positions
