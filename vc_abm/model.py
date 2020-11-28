@@ -18,7 +18,7 @@ class VacancyChainAgentBasedModel(Model):
 
     def __init__(self, positions_per_level, actor_retire_probs, vacancy_trans_prob_matrix, firing_schedule,
                  growth_orders, start_percent_female, percent_female_entry_per_step, vacancy_benefit_deficit_matrix,
-                 data_collector, shock_step=0, vacancy_move_period=53):
+                 data_collector, shock_step=0, vacancy_move_period=0):
         """
         :param positions_per_level: list of ints, of positions per level
                                     e.g. [10,20,30] == 10 positions in level 1, 20 in level 2, 30 in level 3
@@ -94,7 +94,7 @@ class VacancyChainAgentBasedModel(Model):
                                     year, which here is operationalised as the "actor-step". In model terms, the
                                     vacancy_move_period is the number of model steps BETWEEN actor steps; only vacancies
                                     are allowed to move in these "vacancy steps" and only actors can move during "actor
-                                    steps". By default this is 53, a  nice, prime number.
+                                    steps". By default this is 0, i.e. vacancies move as often as actors.
                                     NB: adjust this number by consulting collectors.get_count_vacancies_still_in_system
 
         """
