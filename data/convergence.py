@@ -33,8 +33,8 @@ def make_convergence_table(batchruns, measures, out_dir, vacancy_transition_prob
         b_run_per_step_stats = helpers.get_means_std(br)
         for measure_name in measures:
             for line_name in b_run_per_step_stats[measure_name].keys():
-                mean_stdev = helpers.get_batch_run_mean_stdev_lines(b_run_per_step_stats, measure_name, line_name,
-                                                                    burn_in_steps=burn_in_steps)
+                mean_stdev = helpers.get_brun_mean_stdev_lines(b_run_per_step_stats, measure_name, line_name,
+                                                               burn_in_steps=burn_in_steps)
                 vals[idx][measure_name]["measure"][line_name] = np.mean(mean_stdev[0])
                 vals[idx][measure_name]["stdev"][line_name] = np.mean(mean_stdev[1])
 
