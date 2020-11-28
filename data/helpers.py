@@ -19,7 +19,7 @@ from string import punctuation
 from copy import deepcopy
 
 
-def get_batch_run_mean_stdev_lines(batch_run_per_step_stats, metric_name, line_name, burn_in_steps):
+def get_brun_mean_stdev_lines(batch_run_per_step_stats, metric_name, line_name, burn_in_steps):
     """
     Get the mean or stdev line (as a list) of per-step metric values averaged or stdeve'd across all model
     iterations. So each value of the list is e.g. an average of metric values at that step, across all model iterations,
