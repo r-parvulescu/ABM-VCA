@@ -54,8 +54,8 @@ def plot_mean_line(shock_step, metric_name, line_name, mean_line, stdev_line, co
     """Plot a mean line, and optionally a shaded area of two standard deviations around the mean."""
     # since cohorts have total turnover in 30 years, use only the thirty years after the shock step (inclusive)
     if metric_name == "percent_actors_from_before_first_shock":
-        mean_line = mean_line[shock_step:shock_step+31]
-        stdev_line = stdev_line[shock_step:shock_step+31]
+        mean_line = mean_line[shock_step:shock_step+32]
+        stdev_line = stdev_line[shock_step:shock_step+32]
 
     colours = ['r', 'b', 'g', 'k', 'y', 'c', 'm']
     x = np.linspace(0, len(mean_line) - 1, len(mean_line))
@@ -92,7 +92,7 @@ def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name=''
     else:
         plt.title(metric_name.replace('_', ' ').title())
 
-    #
+    # make the legend box and set the axis for drawing the vertical line
     ax = plt.subplot(111)
     box = ax.get_position()
     ax.set_position([box.x0, box.y0 + box.height * 0.1,
@@ -100,7 +100,12 @@ def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name=''
 
     # if there is a shock, draw a vertical, dashed line indicating at which step the shock occurred
     if shock_step:
-        ax.axvline(x=shock_step, lw=2, color='k', linestyle='--')
+        # since actor retirement happens necessarily in a certain number of steps, limit the figure to that period
+        if metric_name == "percent_actors_from_before_first_shock":
+            ax.axvline(x=0, lw=2, color='k', linestyle='--')
+            plt.xticks([i for i in range(0, 32, 10)], [str(i+50) for i in range(0, 32, 10)])
+        else:
+            ax.axvline(x=shock_step, lw=2, color='k', linestyle='--')
 
     # add the legend, label the x and y axes, and add gridlines
     plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.14), fancybox=True, shadow=True, ncol=5, fontsize='medium')
