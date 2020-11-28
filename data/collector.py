@@ -256,11 +256,10 @@ def get_percent_actors_from_before_shock(model):
     """
 
     # get the current actor-step that we're on, as well as the step at which the shock occurred
-    current_step = model.schedule.steps
-    steps_since_first_shocks = current_step - model.shock_step  # NB: negative if evaluated before the shock
+    current_actor_step = model.schedule.steps / model.vac_mov_period
+    steps_since_first_shocks = current_actor_step - model.shock_step  # NB: negative if evaluated before the shock
 
     pre_shock_per_level = {i: {"total_actors": 0., "actors_from_b4_shock": 0.} for i in range(1, model.num_levels + 1)}
-    pre_shock_per_level.update({"pooled": {"total_actors": 0., "actors_from_b4_shock": 0.}})
 
     # fill the dicts with observed counts
     for agent in model.schedule.agents:
