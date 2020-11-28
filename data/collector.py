@@ -169,15 +169,15 @@ def get_time_to_promotion_from_last_level(model):
     Get the average time to promotion for all those promoted in the last actor-step. Disaggregated by the level from
     which you were promoted. NB: does not account for the promotion destination, just where you left from.
     """
-    # NB: can't promote from the last level, so we ignore it
-    time_to_prom = {i: [] for i in range(1, model.num_levels)}
+    # NB: can't promote from the top level (by convention level 1), so we ignore it
+    time_to_prom = {i: [] for i in range(2, model.num_levels+1)}
 
     for agent in model.schedule.agents:
         if agent.type == "actor":
             log = list(filter(None, agent.log))  # get rid of empty years at the beginning
             if len(log) > 1:  # can only look at those who had the chance to move
                 # check to see if they were promoted last turn)
-                if int(log[-2].split("-")[0]) < int(log[-1].split("-")[0]):
+                if int(log[-2].split("-")[0]) > int(log[-1].split("-")[0]):
                     # check how long that last spell was; reverse the log and starting from the second position look for
                     # the first non-matching value; if you don't find a difference then you've been in the same position
                     # since the beginning of the career except the last step, i.e. career length - 1
@@ -228,7 +228,6 @@ def get_percent_female_actors(model):
     # initialise a dict of dicts, where first-order keys are levels, and sub-dicts contain counts of men and women
     # in the respective level. Also add a sub-dict that pools counts across all levels.
     gend_per_level = {i: {"m": 0., "f": 0.} for i in range(1, model.num_levels + 1)}
-    gend_per_level.update({"pooled": {"m": 0., "f": 0.}})
 
     # fill the dicts with observed counts
     for agent in model.schedule.agents:
@@ -236,10 +235,8 @@ def get_percent_female_actors(model):
             current_level = int(agent.position.split('-')[0])
             if agent.gender == "m":
                 gend_per_level[current_level]["m"] += 1.
-                gend_per_level["pooled"]["m"] += 1.
             if agent.gender == "f":
                 gend_per_level[current_level]["f"] += 1.
-                gend_per_level["pooled"]["f"] += 1.
 
     # turn each count sub-dict into percent female
     for k, v in gend_per_level.items():
