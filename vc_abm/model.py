@@ -47,16 +47,16 @@ class VacancyChainAgentBasedModel(Model):
                                           Further details on vacancy movements can be found in entity.vacancy.step
 
         :param firing_schedule: dict, indicating how actors' retirement probabilities should be changed at the specified
-                                actor-steps. So, e.g. {"steps": {5, 6, 7}, "ret probs": [(1, 0.4), (2, 0.4), (3, 0.6)]}
+                                actor-steps. So, e.g. {"steps": {5, 6, 7}, "ret probs": [0.4, 0.4, 0.6]}
                                 means that at each of actor-steps five, six, and seven, the retirement probability of
                                 each actor in level 1 will be 0.4, the retirement probability of each actor in level 2
-                                will be 0.4,and the retirement probability of each actor in level 3 will be 0.6. Before
-                                step ive and after step seven we use the actor retirement probabilities in
+                                will be 0.4, and the retirement probability of each actor in level 3 will be 0.6. Before
+                                step five and after step seven we use the actor retirement probabilities given by
                                 actor_retire_probs
 
         :param growth_orders: dict, indicating how many positions should be added to different levels, at the specified
-                              actor-steps. So, e.g. {"steps": {7, 8}, "extra positions": {1: 10, 2: 50, 3: 150}} means
-                              that at each of actor-steps seven and eight we will add ten new positions in level 1,
+                              actor-steps. So, e.g. {"steps": {7, 8}, "extra positions": [10, 50, 150]} means
+                              that at each of actor-steps seven and eight we will add ten new positions in level one,
                               fifty new positions in level two, and one hundred and fifty new positions in level three.
                               Before step seven and after step eight we do not change the size of the system.
 
@@ -120,7 +120,7 @@ class VacancyChainAgentBasedModel(Model):
         self.positions = {}
         for lvl in range(self.num_levels):
             for spot in range(self.positions_per_level[lvl]):
-                self.create_position(lvl + 1, spot + 1, "actor")  # adding one two 1-index positions codes
+                self.create_position(lvl + 1, spot + 1, "actor")  # +1 in order to 1-index the positions codes
 
     def step(self):
         """Make vacancies and actors move."""
@@ -137,34 +137,31 @@ class VacancyChainAgentBasedModel(Model):
             for pos in self.positions.values():
                 pos.occupant["actor moved in"] = False
 
-        # if there are firing and/or growth orders, carry them out
-        if self.schedule.steps in self.firing_schedule["steps"]:
-            self.fire(self.schedule.steps)
+        # if there are growth orders, carry them out
         if self.schedule.steps in self.growth_orders["steps"]:
             self.grow(self.schedule.steps)
 
-        # make agents move
-        self.schedule.step()
+        # if there are firing orders, make actors step according to them
+        if self.schedule.steps in self.firing_schedule["steps"]:
+            baseline_act_ret_prob = self.act_ret_probs  # save baseline actor retirement probabilities
+            self.act_ret_probs = self.firing_schedule["actor retirement probs"]  # set new retirement probabilities
+            self.schedule.step()  # make actors move
+            self.act_ret_probs = baseline_act_ret_prob  # return to baseline actor retirement probabilities
+        else:  # make agents (actors and vacancies both) step, for all other cases
+            self.schedule.step()
 
         # update the positions' logs, post-step
         for pos_id, pos in self.positions.items():
             pos.log.append((pos.occupant["id"], pos.occupant["type"]))
 
     # part of step
-    def fire(self, step):
-        """At specified step change the retirement probability of actors according to the firing schedule."""
-        retirement_probs = self.firing_schedule["actor retirement probs"]
-        for agent in self.schedule.agents:
-            if agent.type == "actor":
-                agent.move_probability = retirement_probs
-
-    # part of step
     def grow(self, step):
         """At specified step increase the number of positions. All new positions are vacant."""
         for lvl in range(1, self.num_levels + 1):
             # get the highest ID of current positions in this level so you can add new positions starting from there
-            max_position_id_on_this_level = max([int(pos) for pos in self.positions if pos.split("-")[0] == lvl])
-            for new_spot in range(1, self.growth_orders["level growths"][lvl] + 1):
+            max_position_id_on_this_level = max([int(pos.split("-")[1]) for pos in self.positions
+                                                 if int(pos.split("-")[0]) == lvl])
+            for new_spot in range(1, self.growth_orders["extra positions"][lvl-1] + 1):  # -1 since python 0-indexes
                 new_spot_id = max_position_id_on_this_level + new_spot
                 self.create_position(lvl, new_spot_id, "vacancy")
 
