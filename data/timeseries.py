@@ -79,7 +79,7 @@ def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name=''
 
     y_axis_labels = {"average_career_length": "years", "average_vacancy_chain_length": "steps",
                      "percent_female_actors": "percent", "percent_actors_from_before_first_shock": "percent",
-                     "count_vacancies_in_system": "count", "count_vacancies_per_step": "count",
+                     "count_vacancies_still_in_system": "count", "count_vacancies_per_step": "count",
                      "actor_counts": "count", "agent_sets_sizes": "count",
                      "actor_turnover_rate": "turnover per actor step",
                      "time_to_promotion_from_last_level": "actor steps",
