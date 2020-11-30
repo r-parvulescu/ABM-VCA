@@ -1,22 +1,5 @@
 """
-TO GET
-
-CHAIN MEASURES
-
-Transition Matrices
-
-Average Across All Years
-- observed vacancy transition matrix
-- difference between observed vacancy transition matrix and input transition matrix
-
-
-ACTOR MEASURES
-
-across all years
-- observed actor transition matrix
-- difference between observed actor transition matrix and hypothetical input (actor) transition matrix
-
-
+FUnctions for collecting per-step data from VacancyChainAgentBasedModel.
 """
 
 import statistics
