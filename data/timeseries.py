@@ -59,7 +59,7 @@ def plot_mean_line(shock_step, metric_name, line_name, mean_line, stdev_line, co
         stdev_line = stdev_line[shock_step:shock_step+32]
 
     # if the line name refers to a hierarchical level (e.g. 1, 2), then add  "Level" to the line name
-    if type(line_name) == int:
+    if isinstance(line_name, int):
         line_name = "Level " + str(line_name)
 
     colours = ['r', 'b', 'g', 'k', 'y', 'c', 'm']
