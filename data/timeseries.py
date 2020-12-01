@@ -52,10 +52,15 @@ def make_time_series_figures(batchruns, out_dir, burn_in_steps=0, shock_step=0, 
 
 def plot_mean_line(shock_step, metric_name, line_name, mean_line, stdev_line, colour_counter, linestyle, stdev=True):
     """Plot a mean line, and optionally a shaded area of two standard deviations around the mean."""
+
     # since cohorts have total turnover in 30 years, use only the thirty years after the shock step (inclusive)
     if metric_name == "percent_actors_from_before_first_shock":
         mean_line = mean_line[shock_step:shock_step+32]
         stdev_line = stdev_line[shock_step:shock_step+32]
+
+    # if the line name refers to a hierarchical level (e.g. 1, 2), then add  "Level" to the line name
+    if type(line_name) == int:
+        line_name = "Level " + str(line_name)
 
     colours = ['r', 'b', 'g', 'k', 'y', 'c', 'm']
     x = np.linspace(0, len(mean_line) - 1, len(mean_line))
@@ -77,14 +82,14 @@ def plot_mean_line(shock_step, metric_name, line_name, mean_line, stdev_line, co
 def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name=''):
     """Complete a figure with titles, legend, extra line-markers and grid, then saves the figure to disk."""
 
-    y_axis_labels = {"average_career_length": "years", "average_vacancy_chain_length": "steps",
+    y_axis_labels = {"average_career_length": "actor steps", "average_vacancy_chain_length": "positions",
                      "percent_female_actors": "percent", "percent_actors_from_before_first_shock": "percent",
                      "count_vacancies_still_in_system": "count", "count_vacancies_per_step": "count",
                      "actor_counts": "count", "agent_sets_sizes": "count",
-                     "actor_turnover_rate": "turnover per actor step",
+                     "actor_turnover_rate": "actor turnover per position",
                      "time_to_promotion_from_last_level": "actor steps",
                      "time_to_retirement_from_last_level": "actor steps",
-                     "net_vacancy_effects": "unit"}
+                     "net_vacancy_effects": "value unit"}
 
     # if no title name provided, use function name
     if experiment_name:
@@ -109,7 +114,7 @@ def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name=''
 
     # add the legend, label the x and y axes, and add gridlines
     plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.14), fancybox=True, shadow=True, ncol=5, fontsize='medium')
-    plt.xlabel("periods")
+    plt.xlabel("actor steps")
     plt.ylabel(y_axis_labels[metric_name])
     plt.grid()
 
