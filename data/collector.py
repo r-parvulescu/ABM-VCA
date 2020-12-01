@@ -176,6 +176,8 @@ def get_time_to_promotion_from_last_level(model):
         for k, v in time_to_prom.items():
             if v:  # ignore empty lists
                 time_to_prom[k] = statistics.mean(v)
+            else:
+                time_to_prom[k] = None
 
     return time_to_prom
 
@@ -201,6 +203,8 @@ def get_time_to_retirement_from_last_level(model):
         for k, v in retire_time_per_level.items():
             if v:  # ignore empty lists
                 retire_time_per_level[k] = statistics.mean(v)
+            else:
+                retire_time_per_level[k] = None
 
     return retire_time_per_level
 
@@ -290,6 +294,8 @@ def get_average_log_length(model, agent_type):
     for k, v in log_lengths_per_level.items():
         if v:  # ignore empty lists, e.g. list of vacancy moves at the first actor step, when no vacancy has moved yet
             log_lengths_per_level[k] = statistics.mean(v)
+        else:
+            log_lengths_per_level[k] = None
 
     return log_lengths_per_level
 
