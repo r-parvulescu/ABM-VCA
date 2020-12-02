@@ -129,7 +129,6 @@ class VacancyChainAgentBasedModel(Model):
         # that are NO LONGER in the system, i.e. that worked their way out in the previous fifty-two steps
         if self.schedule.steps % self.vac_mov_period == 0:
             self.data_collector.collect(self)
-
             # reset the pool of retired vacancies and actors, so that it's fresh for the next round
             self.retirees = {"actor": [], "vacancy": []}
 
@@ -138,11 +137,11 @@ class VacancyChainAgentBasedModel(Model):
                 pos.occupant["actor moved in"] = False
 
         # if there are growth orders, carry them out
-        if self.schedule.steps in self.growth_orders["steps"]:
+        if self.schedule.steps / self.vac_mov_period in self.growth_orders["steps"]:
             self.grow()
 
         # if there are firing orders, make actors step according to them
-        if self.schedule.steps in self.firing_schedule["steps"]:
+        if self.schedule.steps / self.vac_mov_period in self.firing_schedule["steps"]:
             baseline_act_ret_prob = self.act_ret_probs  # save baseline actor retirement probabilities
             self.act_ret_probs = self.firing_schedule["actor retirement probs"]  # set new retirement probabilities
             self.schedule.step()  # make actors move

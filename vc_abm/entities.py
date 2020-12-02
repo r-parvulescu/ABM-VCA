@@ -243,10 +243,11 @@ class Vacancy(Mover):
             # handle retiring vacancies
             if next_level == "retire":
                 outside_actor = Actor(uuid.uuid4(), self.model)
-                current_step = self.model.schedule.steps
+                # always use information from the immediately preceding actor steps
+                current_actor_step = int(self.model.schedule.steps / self.model.vac_mov_period)
 
                 # assign actor's gender according to the model-provided probability that new recruits are female
-                if random.uniform(0.0, 1.0) <= self.model.percent_fem_entry_per_step[current_step]:
+                if random.uniform(0.0, 1.0) <= self.model.percent_fem_entry_per_step[current_actor_step]:
                     outside_actor.gender = "f"
                 else:
                     outside_actor.gender = "m"
