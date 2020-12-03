@@ -7,7 +7,8 @@ import numpy as np
 from data import helpers
 
 
-def make_time_series_figures(batchruns, out_dir, burn_in_steps=0, shock_step=0, stdev=True, experiment_name=''):
+def make_time_series_figures(batchruns, out_dir, level_names, burn_in_steps=0, shock_step=0, stdev=True,
+                             experiment_name='', ncol=3):
     """
     Makes time series figures and save them to disk. If the input is more than one batchrun, overlay the output of the
     two batchruns in the same figure, so you can see the difference between batchruns.
@@ -23,6 +24,8 @@ def make_time_series_figures(batchruns, out_dir, burn_in_steps=0, shock_step=0, 
     :param stdev: bool, whether we plot shaded areas around the mean line, representing two standard deviations away
                   from the mean; False by default
     :param experiment_name: str, the name of the particular simulation experiment, e.g. "The Big Purge"
+    :param ncol: int, number of columns in the figure's legend
+    :param level_names: dict, the names associated with different hierachical levels, e.g. {1: "Top", 2: "Bottom"}
     :return None
     """
 
@@ -34,6 +37,8 @@ def make_time_series_figures(batchruns, out_dir, burn_in_steps=0, shock_step=0, 
 
     for m_name in metric_names:
 
+        plt.figure(figsize=(7, 7))  # set the size of the figure
+
         for idx, br_per_step_stats in enumerate(batch_runs_per_step_stats):
 
             colour_counter = 0
@@ -42,25 +47,27 @@ def make_time_series_figures(batchruns, out_dir, burn_in_steps=0, shock_step=0, 
                 b_run_mean_line, b_run_stdev_line = helpers.get_brun_mean_stdev_lines(br_per_step_stats, m_name,
                                                                                       line_name, burn_in_steps)
                 # plot the lines
-                plot_mean_line(shock_step, m_name, line_name, b_run_mean_line, b_run_stdev_line, colour_counter,
-                               linestyles[idx], stdev)
+                plot_mean_line(m_name, line_name, b_run_mean_line, b_run_stdev_line, colour_counter, linestyles[idx],
+                               level_names, stdev)
                 colour_counter += 1
 
         # name the plot, save the figure to disk
-        save_figure(m_name, batchruns[0], out_dir, shock_step=shock_step, experiment_name=experiment_name)
+        save_figure(m_name, batchruns[0], out_dir, shock_step=shock_step, experiment_name=experiment_name, ncol=ncol)
 
 
-def plot_mean_line(shock_step, metric_name, line_name, mean_line, stdev_line, colour_counter, linestyle, stdev=True):
+def plot_mean_line(metric_name, line_name, mean_line, stdev_line, colour_counter, linestyle, level_names,
+                   stdev=True):
     """Plot a mean line, and optionally a shaded area of two standard deviations around the mean."""
 
-    # since cohorts have total turnover in 30 years, use only the thirty years after the shock step (inclusive)
-    if metric_name == "percent_actors_from_before_first_shock":
-        mean_line = mean_line[shock_step:shock_step+32]
-        stdev_line = stdev_line[shock_step:shock_step+32]
+    # since cohorts have total turnover in 32 years, use only the first thirty-two years after the shock step
+    # NB: if the shock step is zero, then this limits our view to the initialisation cohort of actors.
+    if metric_name == "percent_actors_from_before_shock":
+        mean_line = mean_line[:33]
+        stdev_line = stdev_line[:33]
 
     # if the line name refers to a hierarchical level (e.g. 1, 2), then add  "Level" to the line name
     if isinstance(line_name, int):
-        line_name = "Level " + str(line_name)
+        line_name = level_names[line_name] if line_name else "Level " + str(line_name)
 
     colours = ['r', 'b', 'g', 'k', 'y', 'c', 'm']
     x = np.linspace(0, len(mean_line) - 1, len(mean_line))
@@ -79,11 +86,11 @@ def plot_mean_line(shock_step, metric_name, line_name, mean_line, stdev_line, co
         plt.fill_between(x, stdev_lowbound, stdev_highbound, color=colours[colour_counter][0], alpha=0.2)
 
 
-def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name=''):
+def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name='', ncol=3):
     """Complete a figure with titles, legend, extra line-markers and grid, then saves the figure to disk."""
 
     y_axis_labels = {"average_career_length": "actor steps", "average_vacancy_chain_length": "positions",
-                     "percent_female_actors": "percent", "percent_actors_from_before_first_shock": "percent",
+                     "percent_female_actors": "percent", "percent_actors_from_before_shock": "percent",
                      "count_vacancies_still_in_system": "count", "count_vacancies_per_step": "count",
                      "actor_counts": "count", "agent_sets_sizes": "count",
                      "actor_turnover_rate": "actor turnover per position",
@@ -105,15 +112,12 @@ def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name=''
 
     # if there is a shock, draw a vertical, dashed line indicating at which step the shock occurred
     if shock_step:
-        # since actor retirement happens necessarily in a certain number of steps, limit the figure to that period
-        if metric_name == "percent_actors_from_before_first_shock":
-            ax.axvline(x=0, lw=2, color='k', linestyle='--')
-            plt.xticks([i for i in range(0, 32, 10)], [str(i+50) for i in range(0, 32, 10)])
-        else:
-            ax.axvline(x=shock_step, lw=2, color='k', linestyle='--')
+        ax.axvline(x=0, lw=2, color='k', linestyle='--')
 
-    # add the legend, label the x and y axes, and add gridlines
-    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.14), fancybox=True, shadow=True, ncol=5, fontsize='medium')
+    # add the legend
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.14), fancybox=True, shadow=True, ncol=ncol,
+               fontsize='medium')
+    # add label the x and y axes, add gridlines
     plt.xlabel("actor steps")
     plt.ylabel(y_axis_labels[metric_name])
     plt.grid()
