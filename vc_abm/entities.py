@@ -247,7 +247,7 @@ class Vacancy(Mover):
                 current_actor_step = int(self.model.schedule.steps / self.model.vac_mov_period)
 
                 # assign actor's gender according to the model-provided probability that new recruits are female
-                if random.uniform(0.0, 1.0) <= self.model.percent_fem_entry_per_step[current_actor_step]:
+                if random.uniform(0.0, 1.0) <= self.model.prob_fem_entry_per_step[current_actor_step]:
                     outside_actor.gender = "f"
                 else:
                     outside_actor.gender = "m"
