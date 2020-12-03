@@ -17,7 +17,7 @@ class VacancyChainAgentBasedModel(Model):
     """"""
 
     def __init__(self, positions_per_level, actor_retire_probs, vacancy_trans_prob_matrix, firing_schedule,
-                 growth_orders, start_percent_female, percent_female_entry_per_step, vacancy_benefit_deficit_matrix,
+                 growth_orders, start_fraction_female, prob_female_entry_per_step, vacancy_benefit_deficit_matrix,
                  data_collector, shock_step=0, vacancy_move_period=0):
         """
         :param positions_per_level: list of ints, of positions per level
@@ -60,16 +60,16 @@ class VacancyChainAgentBasedModel(Model):
                               fifty new positions in level two, and one hundred and fifty new positions in level three.
                               Before step seven and after step eight we do not change the size of the system.
 
-        :param start_percent_female: float, gender ratio with which we initialise actors at the beginning of the model,
+        :param start_fraction_female: float, gender ratio with which we initialise actors at the beginning of the model,
                                      e.g. 0.6 means that at model initialisation sixty percent of all actors are female
 
-        :param percent_female_entry_per_step: dict, indicating the probability that an actor called from the outside by
-                                              a vacancy retirement will be female, at the designated actor steps. So,
-                                              e.g. {20: 0.6, 21: 0.7, 22: 0.7} means that at actor step twenty each
-                                              newly-called actor has a probability of 0.6 of being female, while at each
-                                              of actor steps twenty-one and twenty-two each newly-called actor has a
-                                              probability of 0.7 of being female.
-                                              NB: this dict must be defined for ALL actor-steps of the model
+        :param prob_female_entry_per_step: dict, indicating the probability that an actor called from the outside by
+                                           a vacancy retirement will be female, at the designated actor steps. So,
+                                           e.g. {20: 0.6, 21: 0.7, 22: 0.7} means that at actor step twenty each
+                                           newly-called actor has a probability of 0.6 of being female, while at each
+                                           of actor steps twenty-one and twenty-two each newly-called actor has a
+                                           probability of 0.7 of being female.
+                                           NB: this dict must be defined for ALL actor-steps of the model
 
         :param vacancy_benefit_deficit_matrix: changes in some unit associated with vacancy movements. E.g. this matrix
 
@@ -102,7 +102,7 @@ class VacancyChainAgentBasedModel(Model):
         # set parameters
         self.num_levels, self.positions_per_level = len(positions_per_level), positions_per_level
         self.firing_schedule, self.growth_orders = firing_schedule, growth_orders
-        self.start_percent_fem, self.percent_fem_entry_per_step = start_percent_female, percent_female_entry_per_step
+        self.start_fraction_fem, self.prob_fem_entry_per_step = start_fraction_female, prob_female_entry_per_step
         self.act_ret_probs, self.vac_trans_prob_mat = actor_retire_probs, vacancy_trans_prob_matrix
         self.vac_trans_mat_num_cols = len(vacancy_trans_prob_matrix[0])
         self.vac_ben_def_mat = vacancy_benefit_deficit_matrix
@@ -179,7 +179,7 @@ class VacancyChainAgentBasedModel(Model):
         # create new moving agent and add it to the scheduler
         new_agent = Vacancy(uuid.uuid4(), self) if agent_type == "vacancy" else Actor(uuid.uuid4(), self)
         if agent_type == "actor":
-            new_agent.gender = "f" if bool(np.random.binomial(1, self.start_percent_fem)) else "m"
+            new_agent.gender = "f" if bool(np.random.binomial(1, self.start_fraction_fem)) else "m"
             # to avoid clumpy cohort effects and therefore the number of burn-in steps, give each actor a random career
             # age of 10-22, since these are the equilibrium career ages per level; this way the "start" of the system
             # is smoother
