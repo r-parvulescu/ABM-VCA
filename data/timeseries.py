@@ -29,7 +29,7 @@ def make_time_series_figures(batchruns, out_dir, level_names, burn_in_steps=0, s
     :return None
     """
 
-    linestyles = ['-', '--', '-.', ':']
+    linestyles = ['-', '--', ':', '-.']
 
     batch_runs_per_step_stats = [helpers.get_means_std(br) for br in batchruns]
 
