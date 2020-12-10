@@ -258,8 +258,8 @@ class Vacancy(Mover):
             else:  # handle vacancies that want to move an actor
 
                 # select up to five desired positions to which you (the vacancy) would like to move
-                # NB: these are NOT uniques, though hopefully they mostly will be since get_next_position_info
-                # incorporates a random selector
+                # NB: these positions are not necessarily uniques, though hopefully they mostly will be since
+                # get_next_position_info incorporates a random selector
                 desired_positions = [self.get_next_position_info(next_level) for i in range(5)]
 
                 # for each positions, see get information on it and its current occupant
