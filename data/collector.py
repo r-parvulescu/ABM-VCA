@@ -304,7 +304,8 @@ def get_agent_sets_sizes(model):
     """
     Return the number of positions, number of agents, and number of vacancies associated with one actor-step; this
     is a sanity check.
+    NB: within the data_collector this function ALWAYS needs to go at the end, since it triggers legend label changes.
     """
     return {"actor": len([1 for agent in model.schedule.agents if agent.type == "actor"]),
-            "position": len(model.retirees["vacancy"]),
-            "vacancy": len(model.positions.keys())}
+            "vacancy": len(model.retirees["vacancy"]),
+            "position": len(model.positions.keys())}
