@@ -17,8 +17,8 @@ class VacancyChainAgentBasedModel(Model):
     """"""
 
     def __init__(self, positions_per_level, actor_retire_probs, vacancy_trans_prob_matrix, firing_schedule,
-                 growth_orders, start_fraction_female, prob_female_entry_per_step, vacancy_benefit_deficit_matrix,
-                 data_collector, shock_step=0, vacancy_move_period=0):
+                 growth_orders, shrink_orders, start_fraction_female, prob_female_entry_per_step,
+                 vacancy_benefit_deficit_matrix, data_collector, shock_step=0, vacancy_move_period=0):
         """
         :param positions_per_level: list of ints, of positions per level
                                     e.g. [10,20,30] == 10 positions in level 1, 20 in level 2, 30 in level 3
@@ -58,7 +58,13 @@ class VacancyChainAgentBasedModel(Model):
                               actor-steps. So, e.g. {"steps": {7, 8}, "extra positions": [10, 50, 150]} means
                               that at each of actor-steps seven and eight we will add ten new positions in level one,
                               fifty new positions in level two, and one hundred and fifty new positions in level three.
-                              Before step seven and after step eight we do not change the size of the system.
+                              Before step seven and after step eight we do not increase the size of the system.
+
+        :param shrink_orders: dict, indicating how many positions should be removed from different levels, at the
+                              specified actor-steps. So, e.g. {"steps": {5, 6}, "num to remove": [4, 20, 13]} means
+                              that at each of actor-steps five and six we will remove four positions in level 1,
+                              twenty positions in level two, and thirteen positions in level three. Before step five and
+                              after step six we do not decrease the size of the system.
 
         :param start_fraction_female: float, gender ratio with which we initialise actors at the beginning of the model,
                                      e.g. 0.6 means that at model initialisation sixty percent of all actors are female
@@ -102,6 +108,7 @@ class VacancyChainAgentBasedModel(Model):
         # set parameters
         self.num_levels, self.positions_per_level = len(positions_per_level), positions_per_level
         self.firing_schedule, self.growth_orders = firing_schedule, growth_orders
+        self.shrink_orders = shrink_orders
         self.start_fraction_fem, self.prob_fem_entry_per_step = start_fraction_female, prob_female_entry_per_step
         self.act_ret_probs, self.vac_trans_prob_mat = actor_retire_probs, vacancy_trans_prob_matrix
         self.vac_trans_mat_num_cols = len(vacancy_trans_prob_matrix[0])
@@ -140,6 +147,10 @@ class VacancyChainAgentBasedModel(Model):
         if self.schedule.steps / self.vac_mov_period in self.growth_orders["steps"]:
             self.grow()
 
+        # if there are shrink orders, carry them out
+        if self.schedule.steps / self.vac_mov_period in self.shrink_orders["steps"]:
+            self.shrink()
+
         # if there are firing orders, make actors step according to them
         if self.schedule.steps / self.vac_mov_period in self.firing_schedule["steps"]:
             baseline_act_ret_prob = self.act_ret_probs  # save baseline actor retirement probabilities
@@ -163,6 +174,24 @@ class VacancyChainAgentBasedModel(Model):
             for new_spot in range(1, self.growth_orders["extra positions"][lvl-1] + 1):  # -1 since python 0-indexes
                 new_spot_id = max_position_id_on_this_level + new_spot
                 self.create_position(lvl, new_spot_id, "vacancy")
+
+    # part of step
+    def shrink(self):
+        """Remove positions, forcibly retiring the actors occupying said positions. NB: must run on actor steps."""
+        for lvl in range(1, self.num_levels + 1):
+            # get the highest ID of current positions in this level so that we remove positions "from the top"
+            max_position_id_on_this_level = max([int(pos.split("-")[1]) for pos in self.positions
+                                                 if int(pos.split("-")[0]) == lvl])
+            for dead_pos in range(0, self.shrink_orders["num to remove"][lvl - 1] + 1):  # -1 since python 0-indexes
+                dead_pos_id = str(lvl) + "-" + str(max_position_id_on_this_level - dead_pos)
+                # forcibly retire the actor occupying said position
+                occupant_id = self.positions[dead_pos_id].occupant["id"]
+                for actor in self.schedule.agents:
+                    if actor.unique_id == occupant_id:
+                        self.schedule.remove(actor)  # take actor out of schedule
+                        self.retirees["actor"].append(actor)  # put actor in the list of retirees
+                # then remove that position
+                self.positions.pop(dead_pos_id)
 
     def create_position(self, lvl, spot, agent_type):
         """
