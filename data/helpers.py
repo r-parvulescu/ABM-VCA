@@ -101,7 +101,7 @@ def flatten_dict(pandas_series):
     e.g. pd.Series({"me": you, "her": him}, {"me": Thou, "her": jim}) => {"me": you, Thou, "her": him, jim}
     """
     # TODO this might be messing up order, need to look into it again
-    keys = pandas_series[0].keys()
+    keys = pandas_series[len(pandas_series) - 1].keys()
     values_across_steps = {k: [] for k in keys}
     for step in pandas_series:
         for base_value in step.items():
