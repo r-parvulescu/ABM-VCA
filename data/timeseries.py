@@ -3,11 +3,12 @@ Functions for plotting per-step means and standard deviations of metrics from ba
 """
 
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 from data import helpers
 
 
-def make_time_series_figures(batchruns, out_dir, level_names, burn_in_steps=0, shock_step=0, stdev=True,
+def make_time_series_figures(batchruns, out_dir, level_names, exp_case_names, burn_in_steps=0, shock_step=0, stdev=True,
                              experiment_name='', ncol=3):
     """
     Makes time series figures and save them to disk. If the input is more than one batchrun, overlay the output of the
@@ -52,7 +53,8 @@ def make_time_series_figures(batchruns, out_dir, level_names, burn_in_steps=0, s
                 colour_counter += 1
 
         # name the plot, save the figure to disk
-        save_figure(m_name, batchruns[0], out_dir, shock_step=shock_step, experiment_name=experiment_name, ncol=ncol)
+        save_figure(m_name, batchruns[0], out_dir, level_names, exp_case_names,
+                    shock_step=shock_step,  experiment_name=experiment_name, ncol=ncol)
 
 
 def plot_mean_line(metric_name, line_name, mean_line, stdev_line, colour_counter, linestyle, level_names,
@@ -86,7 +88,7 @@ def plot_mean_line(metric_name, line_name, mean_line, stdev_line, colour_counter
         plt.fill_between(x, stdev_lowbound, stdev_highbound, color=colours[colour_counter][0], alpha=0.2)
 
 
-def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name='', ncol=3):
+def save_figure(metric_name, batchrun, out_dir, level_names, exp_case_names, shock_step=0, experiment_name='', ncol=3):
     """Complete a figure with titles, legend, extra line-markers and grid, then saves the figure to disk."""
 
     y_axis_labels = {"average_career_length": "actor steps", "average_vacancy_chain_length": "positions",
@@ -114,9 +116,24 @@ def save_figure(metric_name, batchrun, out_dir, shock_step=0, experiment_name=''
     if shock_step:
         ax.axvline(x=0, lw=2, color='k', linestyle='--')
 
-    # add the legend
-    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.14), fancybox=True, shadow=True, ncol=ncol,
-               fontsize='medium')
+    # add the legend that identifies levels/strata of the system by color
+    colours = ['r', 'b', 'g', 'k', 'y', 'c', 'm']
+    lgnd1_lines = [Line2D([0], [0], c=colours[i], lw=2, ls="-") for i in range(len(level_names))]
+    ncol_colours = 1 if len(level_names) <= 3 else 2
+    # NB: I'm being risky here since the level come as dict values and I'm just list-ing the values so in principle
+    # this could scramble up their order and mislabel the legend lines, but in practice it never does; still, risky
+    color_legend = plt.legend(lgnd1_lines, list(level_names.values()), loc='upper right', bbox_to_anchor=(1.1, -0.09),
+                              ncol=ncol_colours)
+    plt.gca().add_artist(color_legend)
+
+    # add another legend for linestyles, where each style indicates a different simulation case
+    linestyles = ['-', '--', ':', '-.']
+    lgnd2_lines = [Line2D([0], [0], c='k', lw=2, ls=linestyles[i]) for i in range(len(exp_case_names))]
+    ncol_exp_cases = 1 if len(exp_case_names) <= 3 else 2
+    linestyle_legend = plt.legend(lgnd2_lines, exp_case_names, loc='upper left', bbox_to_anchor=(-0.1, -0.09),
+                                  ncol=ncol_exp_cases)
+    plt.gca().add_artist(linestyle_legend)
+
     # add label the x and y axes, add gridlines
     plt.xlabel("actor steps")
     plt.ylabel(y_axis_labels[metric_name])
