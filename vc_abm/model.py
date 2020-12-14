@@ -47,24 +47,26 @@ class VacancyChainAgentBasedModel(Model):
                                           Further details on vacancy movements can be found in entity.vacancy.step
 
         :param firing_schedule: dict, indicating how actors' retirement probabilities should be changed at the specified
-                                actor-steps. So, e.g. {"steps": {5, 6, 7}, "ret probs": [0.4, 0.4, 0.6]}
-                                means that at each of actor-steps five, six, and seven, the retirement probability of
-                                each actor in level 1 will be 0.4, the retirement probability of each actor in level 2
-                                will be 0.4, and the retirement probability of each actor in level 3 will be 0.6. Before
-                                step five and after step seven we use the actor retirement probabilities given by
-                                actor_retire_probs
+                                actor-steps. So, e.g. {5: [0.4, 0.4, 0.6], 6: [0.2, 0.2, 0.4]} means that at actor-step
+                                five the retirement probabilities of actors in levels 1, 2, and 3 will be 0.4, 0.4, and
+                                0.6 (respectively), and at actor-step 6 the retirement probabilities of actors in levels
+                                1, 2, and 3 will be 0.2, 0.2, and 0.4, respectively. Besides step five and step six we
+                                use the actor retirement probabilities given by actor_retire_probs.
 
         :param growth_orders: dict, indicating how many positions should be added to different levels, at the specified
-                              actor-steps. So, e.g. {"steps": {7, 8}, "extra positions": [10, 50, 150]} means
-                              that at each of actor-steps seven and eight we will add ten new positions in level one,
-                              fifty new positions in level two, and one hundred and fifty new positions in level three.
-                              Before step seven and after step eight we do not increase the size of the system.
+                              actor-steps. So, e.g. {20: [10, 50, 150], 40: [5, 5, 0]} means that at actor-step twenty
+                              we will add ten new positions in level one, fifty new positions in level two, and one
+                              hundred and fifty new positions in level three. while at step forty we add five positions
+                              each to levels one and two. Besides step twenty and forty we do not increase the size of
+                              the system.
 
         :param shrink_orders: dict, indicating how many positions should be removed from different levels, at the
-                              specified actor-steps. So, e.g. {"steps": {5, 6}, "num to remove": [4, 20, 13]} means
-                              that at each of actor-steps five and six we will remove four positions in level 1,
-                              twenty positions in level two, and thirteen positions in level three. Before step five and
-                              after step six we do not decrease the size of the system.
+                              specified actor-steps. So, e.g. {12: [4, 20, 13], 77: [1, 0, 40]} means that at
+                              actor-step twelve we remove remove four positions from level 1, twenty positions from
+                              level two, and thirteen positions from level three, while at actor-step seventy-seven we
+                              remove one position from level one, leave level two as is, and remove forty posotions from
+                              level three. Besides step twelve and seventy-seven we do not decrease the size of the
+                              system.
 
         :param level_addition: dict, indicating: the step at which we want to add a new level, the new level's position
                                within the existing hierarchy (e.g. top, or second-to-last), how many positions will be
@@ -141,36 +143,38 @@ class VacancyChainAgentBasedModel(Model):
     def step(self):
         """Make vacancies and actors move."""
 
-        # every fifty-third step, collect data for actors that are STILL in the system, and collect data for vacancies
-        # that are NO LONGER in the system, i.e. that worked their way out in the previous fifty-two steps
+        # every actor step, collect data for actors that are STILL in the system, and collect data for vacancies
+        # that are NO LONGER in the system, i.e. that worked their way out since the previous actor step
         if self.schedule.steps % self.vac_mov_period == 0:
             self.data_collector.collect(self)
             # reset the pool of retired vacancies and actors, so that it's fresh for the next round
             self.retirees = {"actor": [], "vacancy": []}
 
-            # reset bools indicating if position witnessed actor movement this step, so its fresh for the next round
+            # refresh bools indicating whether positions witnessed actor movement this actor step
             for pos in self.positions.values():
                 pos.occupant["actor moved in"] = False
 
+        current_actor_step = self.schedule.steps / self.vac_mov_period
+
         # if there are growth orders, carry them out
-        if self.schedule.steps / self.vac_mov_period in self.growth_orders["steps"]:
-            self.grow()
+        if current_actor_step in self.growth_orders:
+            self.grow(current_actor_step)
 
         # if there are shrink orders, carry them out
-        if self.schedule.steps / self.vac_mov_period in self.shrink_orders["steps"]:
-            self.shrink()
+        if current_actor_step in self.shrink_orders:
+            self.shrink(current_actor_step)
 
         # if we are adding a level, do it
-        if self.schedule.steps / self.vac_mov_period == self.level_addition["step"]:
+        if current_actor_step == self.level_addition["step"]:
             self.add_level()
 
-        # if there are firing orders, make actors step according to them
-        if self.schedule.steps / self.vac_mov_period in self.firing_schedule["steps"]:
+        # if there are firing orders, make actors move according to them
+        if current_actor_step in self.firing_schedule:
             baseline_act_ret_prob = self.act_ret_probs  # save baseline actor retirement probabilities
-            self.act_ret_probs = self.firing_schedule["actor retirement probs"]  # set new retirement probabilities
+            self.act_ret_probs = self.firing_schedule[current_actor_step]  # set new ret probs
             self.schedule.step()  # make actors move
             self.act_ret_probs = baseline_act_ret_prob  # return to baseline actor retirement probabilities
-        else:  # make agents (actors and vacancies both) step, for all other cases
+        else:  # make agents (actors and vacancies both) move, for all other cases
             self.schedule.step()
 
         # update the positions' logs, post-step
@@ -178,24 +182,24 @@ class VacancyChainAgentBasedModel(Model):
             pos.log.append((pos.occupant["id"], pos.occupant["type"]))
 
     # part of step
-    def grow(self):
+    def grow(self, current_actor_step):
         """Increase the number of positions. All new positions are vacant."""
         for lvl in range(1, self.num_levels + 1):
             # get the highest ID of current positions in this level so you can add new positions starting from there
             max_position_id_on_this_level = max([int(pos.split("-")[1]) for pos in self.positions
                                                  if int(pos.split("-")[0]) == lvl])
-            for new_spot in range(1, self.growth_orders["extra positions"][lvl-1] + 1):  # -1 since python 0-indexes
+            for new_spot in range(1, self.growth_orders[current_actor_step][lvl-1] + 1):  # lvl-1 since Py 0-indexes
                 new_spot_id = max_position_id_on_this_level + new_spot
                 self.create_position(lvl, new_spot_id, "vacancy")
 
     # part of step
-    def shrink(self):
+    def shrink(self, current_actor_step):
         """Remove positions, forcibly retiring the agents occupying said positions."""
         for lvl in range(1, self.num_levels + 1):
             # get the highest ID of current positions in this level so that we remove positions "from the top"
             max_position_id_on_this_level = max([int(pos.split("-")[1]) for pos in self.positions
                                                  if int(pos.split("-")[0]) == lvl])
-            for dead_pos in range(0, self.shrink_orders["num to remove"][lvl - 1] + 1):  # -1 since python 0-indexes
+            for dead_pos in range(0, self.shrink_orders[current_actor_step][lvl - 1] + 1):  # lvl-1 since Py 0-indexes
                 dead_pos_id = str(lvl) + "-" + str(max_position_id_on_this_level - dead_pos)
                 # forcibly retire the actor occupying said position
                 occupant_id = self.positions[dead_pos_id].occupant["id"]
