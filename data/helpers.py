@@ -19,7 +19,7 @@ from string import punctuation
 from copy import deepcopy
 
 
-def get_brun_mean_stdev_lines(batch_run_per_step_stats, metric_name, line_name, burn_in_steps):
+def get_brun_mean_stdev_lines(batch_run_per_step_stats, metric_name, line_name, burn_in_steps, new_level_total_steps):
     """
     Get the mean or stdev line (as a list) of per-step metric values averaged or stdeve'd across all model
     iterations. So each value of the list is e.g. an average of metric values at that step, across all model iterations,
@@ -31,6 +31,8 @@ def get_brun_mean_stdev_lines(batch_run_per_step_stats, metric_name, line_name, 
                       most metrics are disaggregated, usually by hierarchical level, and we want to plot multiple of
                       these lines in one graph.
     :param burn_in_steps: the number of steps from the beginning of the model that we DO NOT want to see
+    :param new_level_total_steps: int or None: if int, then it's the number of total actor steps in the model FOR THE
+                                  CASE IN WHICH A NEW LEVEL IS INTRODUCED PARTWAY; if None, then no new level is added
     :return: a 2-tuple of lists, the mean line and stdev line for that metric, for that line
     """
 
@@ -39,10 +41,15 @@ def get_brun_mean_stdev_lines(batch_run_per_step_stats, metric_name, line_name, 
     for measure_type in batch_run_per_step_stats[metric_name][line_name].keys():
         # NB: ignore burn-in steps
         if measure_type == "Mean Across Runs":
-            br_mean_line = batch_run_per_step_stats[metric_name][line_name][measure_type][burn_in_steps:]
+            br_mean_line = batch_run_per_step_stats[metric_name][line_name][measure_type]
         else:
-            br_stdev_line = batch_run_per_step_stats[metric_name][line_name][measure_type][burn_in_steps:]
-    return br_mean_line, br_stdev_line
+            br_stdev_line = batch_run_per_step_stats[metric_name][line_name][measure_type]
+    # if a new level is introduced partway (and therefore does not have observations for a number of actor steps at the
+    # start) then burn-in-steps do not apply to that level's observations; otherwise, throw out the burn-in-steps
+    if new_level_total_steps and len(br_mean_line) <= new_level_total_steps:
+        return br_mean_line, br_stdev_line
+    else:
+        return br_mean_line[burn_in_steps:], br_stdev_line[burn_in_steps:]
 
 
 def get_means_std(batchrun):
