@@ -111,7 +111,7 @@ def handle_level_addition(new_level_info, br_idx, measure_name, line_name, b_run
     """
 
     # for the batchruns that DON'T include level additions
-    if br_idx != new_level_info["level addition batchrun index"]:
+    if br_idx not in new_level_info["level addition batchrun index"]:
 
         # bump down in colour the lines at or below the rank of the level that we're introducing
         if line_name >= new_level_info["new level rank"]:  # recall, ranks are in reverse order, i.e., 1 > 2 > 3
