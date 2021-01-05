@@ -10,7 +10,7 @@ from data import helpers
 
 
 def make_time_series_figures(batchruns, out_dir, level_names, experiment_names, burn_in_steps=0, shock_step=0,
-                             stdev=True, fig_title='', new_level_info=None):
+                             stdev=True, fig_title='', new_level_info=None, level_removal_info=None):
     """
     Makes time series figures and save them to disk. If the input is more than one batchrun, overlay the output of the
     two batchruns in the same figure, so you can see the difference between batchruns.
@@ -38,12 +38,14 @@ def make_time_series_figures(batchruns, out_dir, level_names, experiment_names, 
                                NB that hierarchical levels are 1-indexed and reverse order, i.e. 1 > 2 > 3 > 4 ...
                             c) "new level addition step" : int, the actor-step at which the new level is added, e.g. 20
                             d) "total actor steps" : int, the total number of actor steps in the simulation, e.g. 100
+    :param level_removal_info:
     :return None
     """
 
     linestyles = ['-', '--', ':', '-.']
+    lvl_remove = True if level_removal_info else False
 
-    batch_runs_per_step_stats = [helpers.get_means_std(br) for br in batchruns]
+    batch_runs_per_step_stats = [helpers.get_means_std(br, lvl_remove=lvl_remove) for br in batchruns]
 
     metric_names = batch_runs_per_step_stats[0].keys()
 
@@ -68,7 +70,12 @@ def make_time_series_figures(batchruns, out_dir, level_names, experiment_names, 
                                           level_names, line_style, colour_counter, stdev=stdev, shock_step=shock_step,
                                           burn_in_steps=burn_in_steps)
 
-                else:  # when not dealing with experimental comparisons in which we have level introductions
+                elif level_removal_info and m_name != "agent_sets_sizes":
+                    handle_level_removal(level_removal_info, idx, m_name, line_name, b_run_mean_line, b_run_stdev_line,
+                                         level_names, line_style, colour_counter, stdev=stdev, shock_step=shock_step,
+                                         burn_in_steps=burn_in_steps)
+
+                else:  # when not dealing with experimental comparisons in which we have level introductions or removals
                     plot_mean_line(m_name, line_name, b_run_mean_line, b_run_stdev_line, colour_counter,
                                    line_style, level_names, stdev, shock_step=shock_step,
                                    burn_in_steps=burn_in_steps)
@@ -167,6 +174,57 @@ def handle_level_addition(new_level_info, br_idx, measure_name, line_name, b_run
                                level_names, stdev, shock_step=shock_step, burn_in_steps=burn_in_steps)
 
 
+def handle_level_removal(level_removal_info, br_idx, measure_name, line_name, b_run_mean_line, b_run_stdev_line,
+                         level_names, line_style, colour_counter, stdev=True, shock_step=0, burn_in_steps=0):
+    """
+    Level removal presents a similar challenge to level addition, in that after removal the ranking of the levels
+    changes, and it is this ranking that normally decides colour-coding. This clugey, clugey code covers for that issue,
+    so that we end up with what we would expect: a graph of time series that at the level-removal point shows one of
+    the levels disappearing. More details in the docstring of handle_level_addition
+    """
+    # for the batchruns that DO include a level removal
+    if br_idx in level_removal_info["level removal batchrun index"]:
+
+        # if the lines are at or below the removed level
+        if line_name >= level_removal_info["old level rank"]:  # again, ranks are reversed
+
+            # the bottom level that was folded into the one that was abolished only has data up to the level removal
+            # point, so just straight plot that time series
+            if len(b_run_mean_line) <= level_removal_info["total actor steps"]:
+                plot_mean_line(measure_name, line_name, b_run_mean_line, b_run_stdev_line, colour_counter, line_style,
+                               level_names, stdev, shock_step=shock_step, burn_in_steps=burn_in_steps)
+
+            # otherwise we're dealing the line segment AFTER removal, which the computer takes to be a continuation of
+            # the old level, but really it's the combination of the old level and the one below it, whose rank now
+            # is one step below what it used to be
+            else:
+                # deal with the line segment from BEFORE the level removal
+                pre_removal_mean_line = b_run_mean_line[:level_removal_info["level removal step"] + 1]
+                pre_removal_stdev_line = b_run_stdev_line[:level_removal_info["level removal step"] + 1]
+                plot_mean_line(measure_name, line_name + 1, pre_removal_mean_line, pre_removal_stdev_line,
+                               colour_counter, line_style, level_names, stdev,
+                               shock_step=shock_step, burn_in_steps=burn_in_steps)
+
+                # deal with the line segment from AFTER the level removal
+                post_removal_mean_line = b_run_mean_line[level_removal_info["level removal step"] + 1:]
+                post_removal_stdev_line = b_run_stdev_line[level_removal_info["level removal step"] + 1:]
+                # need to pad these post-removal segments so they start at the removal point
+                nones = (level_removal_info["level removal step"] + 1) * [None]
+                post_removal_mean_line = pd.Series(nones + post_removal_mean_line.tolist())
+                post_removal_stdev_line = pd.Series(nones + post_removal_stdev_line.tolist())
+                plot_mean_line(measure_name, line_name, post_removal_mean_line, post_removal_stdev_line,
+                               colour_counter + 1, line_style, level_names, stdev, shock_step=shock_step,
+                               burn_in_steps=burn_in_steps)
+
+        else:  # leave untouched the lines hierarchically superior to the level that we remove partway through
+            plot_mean_line(measure_name, line_name, b_run_mean_line, b_run_stdev_line, colour_counter, line_style,
+                           level_names, stdev, shock_step=shock_step, burn_in_steps=burn_in_steps)
+
+    else:  # plot the lines from the batchruns with no  level removals
+        plot_mean_line(measure_name, line_name, b_run_mean_line, b_run_stdev_line, colour_counter, line_style,
+                       level_names, stdev, shock_step=shock_step, burn_in_steps=burn_in_steps)
+
+
 def plot_mean_line(metric_name, line_name, mean_line, stdev_line, colour_counter, linestyle, level_names, stdev=True,
                    shock_step=0, burn_in_steps=0):
     """Plot a mean line, and optionally a shaded area of two standard deviations around the mean."""
@@ -175,8 +233,8 @@ def plot_mean_line(metric_name, line_name, mean_line, stdev_line, colour_counter
     # NB: if the shock step is zero, then this limits our view to the initialisation cohort of actors.
     if metric_name == "percent_actors_from_before_shock":
         window_start = shock_step - burn_in_steps
-        mean_line = mean_line[window_start:window_start+33]
-        stdev_line = stdev_line[window_start:window_start+33]
+        mean_line = mean_line[window_start:window_start + 33]
+        stdev_line = stdev_line[window_start:window_start + 33]
 
     # if the line name refers to a hierarchical level (e.g. 1, 2), give it a proper name
     if isinstance(line_name, int):
