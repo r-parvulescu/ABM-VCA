@@ -37,7 +37,7 @@ def make_time_series_figures(batchruns, out_dir, level_names, experiment_names, 
                             b) "new level rank" : where in the hierarchy of levels the new level enters; int > 0, and
                                NB that hierarchical levels are 1-indexed and reverse order, i.e. 1 > 2 > 3 > 4 ...
                             c) "new level addition step" : int, the actor-step at which the new level is added, e.g. 20
-                            d) "total actor stess" : int, the total number of actor steps in the simulation, e.g. 100
+                            d) "total actor steps" : int, the total number of actor steps in the simulation, e.g. 100
     :return None
     """
 
