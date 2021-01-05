@@ -52,9 +52,9 @@ def get_brun_mean_stdev_lines(batch_run_per_step_stats, metric_name, line_name, 
         return br_mean_line[burn_in_steps:], br_stdev_line[burn_in_steps:]
 
 
-def get_means_std(batchrun):
+def get_means_std(batchrun, lvl_remove=False):
     """For each step, get a submetric's mean and starndard deviations across all model runs."""
-    metrics = get_metrics_timeseries_dataframes(batchrun)
+    metrics = get_metrics_timeseries_dataframes(batchrun, lvl_remove=lvl_remove)
     per_step_stats = deepcopy(metrics)  # keep nested dict structure but replace dataframes with means and stdevs
     for k in metrics.keys():  # look into the metrics
         for l in metrics[k].items():  # look into the submetrics
@@ -69,7 +69,7 @@ def get_means_std(batchrun):
     return per_step_stats
 
 
-def get_metrics_timeseries_dataframes(batchrun):
+def get_metrics_timeseries_dataframes(batchrun, lvl_remove=False):
     """
     Take a batchrun and return a dict of pd.DataFrames, one for each metric
     each dataframe shows metric timeseries across steps, for each run; example output below
@@ -86,7 +86,7 @@ def get_metrics_timeseries_dataframes(batchrun):
     for one_run in models_in_run_order:
         for metric in one_run.columns.values:
             values_across_steps = one_run.loc[:, metric]
-            flat_values_across_steps = flatten_dict(values_across_steps)
+            flat_values_across_steps = flatten_dict(values_across_steps, lvl_remove=lvl_remove)
             flatten_dicts_into_df(flat_values_across_steps, metric_dataframes, metric)
     return metric_dataframes
 
@@ -100,7 +100,7 @@ def get_data_of_models_in_run_order(batchrun):
     return models_in_run_order
 
 
-def flatten_dict(pandas_series):
+def flatten_dict(pandas_series, lvl_remove=False):
     """
     Flatten a pandas series of dicts, where each dict has the same keys, into a dict whose keys are a list
     of values across (former) subdicts
@@ -108,7 +108,8 @@ def flatten_dict(pandas_series):
     e.g. pd.Series({"me": you, "her": him}, {"me": Thou, "her": jim}) => {"me": you, Thou, "her": him, jim}
     """
     # TODO this might be messing up order, need to look into it again
-    keys = pandas_series[len(pandas_series) - 1].keys()
+    use_row_for_key = 0 if lvl_remove else len(pandas_series) - 1
+    keys = pandas_series[use_row_for_key].keys()
     values_across_steps = {k: [] for k in keys}
     for step in pandas_series:
         for base_value in step.items():
