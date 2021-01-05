@@ -17,8 +17,9 @@ class VacancyChainAgentBasedModel(Model):
     """"""
 
     def __init__(self, positions_per_level, actor_retire_probs, vacancy_trans_prob_matrix, firing_schedule,
-                 growth_orders, shrink_orders, level_addition, start_fraction_female, prob_female_entry_per_step,
-                 vacancy_benefit_deficit_matrix, data_collector, shock_step=0, vacancy_move_period=0):
+                 growth_orders, shrink_orders, level_addition, level_removal, start_fraction_female,
+                 prob_female_entry_per_step, vacancy_benefit_deficit_matrix, data_collector,
+                 shock_step=0, vacancy_move_period=0):
         """
         :param positions_per_level: list of ints, of positions per level
                                     e.g. [10,20,30] == 10 positions in level 1, 20 in level 2, 30 in level 3
@@ -72,10 +73,19 @@ class VacancyChainAgentBasedModel(Model):
                                within the existing hierarchy (e.g. top, or second-to-last), how many positions will be
                                in the new level, updated actor retirement and vacancy transition probabilities for the
                                whole system -- these last two are in the same format as when we initially parametrise
-                               the model, albeit with increased shape to accommodate the new level.
+                               the model, albeit with larger shape to accommodate the new level.
                                NB: assume that we only add one level at one step, i.e. does not accommodate adding
                                    multiple levels, either at once or in several steps. This limitation reflects the
                                    extreme rarity and significance of level additions in real systems.
+
+        :param level_removal: dict, indicating: the step at which we want to remove an existing level, the old level's
+                              position within the existing hierarchy (e.g. top, or second-to-last), and updated actor
+                              retirement and vacancy transition probabilities for the whole system -- these last two are
+                              in the same format as when we initially parametrise the model, albeit with smaller shape
+                              to accommodate the level loss.
+                              NB: assume that we only add one level at one step, i.e. does not accommodate adding
+                                  multiple levels, either at once or in several steps. This limitation reflects the
+                                  extreme rarity and significance of level additions in real systems.
 
         :param start_fraction_female: float, gender ratio with which we initialise actors at the beginning of the model,
                                      e.g. 0.6 means that at model initialisation sixty percent of all actors are female
@@ -118,8 +128,9 @@ class VacancyChainAgentBasedModel(Model):
         super().__init__()
         # set parameters
         self.num_levels, self.positions_per_level = len(positions_per_level), positions_per_level
-        self.firing_schedule, self.growth_orders = firing_schedule, growth_orders
-        self.shrink_orders, self.level_addition = shrink_orders, level_addition
+        self.firing_schedule = firing_schedule
+        self.shrink_orders, self.growth_orders = shrink_orders, growth_orders
+        self.level_addition, self.level_removal = level_addition, level_removal
         self.start_fraction_fem, self.prob_fem_entry_per_step = start_fraction_female, prob_female_entry_per_step
         self.act_ret_probs, self.vac_trans_prob_mat = actor_retire_probs, vacancy_trans_prob_matrix
         self.vac_trans_mat_num_cols = len(vacancy_trans_prob_matrix[0])
@@ -153,7 +164,6 @@ class VacancyChainAgentBasedModel(Model):
             # refresh bools indicating whether positions witnessed actor movement this actor step
             for pos in self.positions.values():
                 pos.occupant["actor moved in"] = False
-
         current_actor_step = self.schedule.steps / self.vac_mov_period
 
         # if there are growth orders, carry them out
@@ -168,13 +178,17 @@ class VacancyChainAgentBasedModel(Model):
         if current_actor_step == self.level_addition["step"]:
             self.add_level()
 
+        # if we are removing a level, do it
+        if current_actor_step == self.level_removal["step"]:
+            self.remove_level()
+
         # if there are firing orders, make actors move according to them
         if current_actor_step in self.firing_schedule:
             baseline_act_ret_prob = self.act_ret_probs  # save baseline actor retirement probabilities
             self.act_ret_probs = self.firing_schedule[current_actor_step]  # set new ret probs
             self.schedule.step()  # make actors move
             self.act_ret_probs = baseline_act_ret_prob  # return to baseline actor retirement probabilities
-        else:  # make agents (actors and vacancies both) move, for all other cases
+        else:  # make agents (actors and vacancies both) move, for all other cases except level removal
             self.schedule.step()
 
         # update the positions' logs, post-step
@@ -188,7 +202,7 @@ class VacancyChainAgentBasedModel(Model):
             # get the highest ID of current positions in this level so you can add new positions starting from there
             max_position_id_on_this_level = max([int(pos.split("-")[1]) for pos in self.positions
                                                  if int(pos.split("-")[0]) == lvl])
-            for new_spot in range(1, self.growth_orders[current_actor_step][lvl-1] + 1):  # lvl-1 since Py 0-indexes
+            for new_spot in range(1, self.growth_orders[current_actor_step][lvl - 1] + 1):  # lvl-1 since Py 0-indexes
                 new_spot_id = max_position_id_on_this_level + new_spot
                 self.create_position(lvl, new_spot_id, "vacancy")
 
@@ -212,8 +226,8 @@ class VacancyChainAgentBasedModel(Model):
                 self.positions.pop(dead_pos_id)
 
     def add_level(self):
-        """Add a level, re-jigging the system to accomodate it."""
-        # change retirement and transition matrixes to that given
+        """Add a level, re-jigging the system to accommodate it."""
+        # change retirement and transition matrixes to those given
         self.act_ret_probs = self.level_addition["updated actor retirement probs"]
         self.vac_trans_prob_mat = self.level_addition["updated vacancy transition prob matrix"]
         # if putting the level above the bottom rank, shift down position IDs both on the position themselves and on
@@ -224,7 +238,7 @@ class VacancyChainAgentBasedModel(Model):
             new_pos_dict = {}
             for pos_id, pos in self.positions.items():
                 current_pos_lvl = int(pos_id.split("-")[0])
-                if current_pos_lvl >= self.level_addition["new level rank"]:  # position ID format is "LVL-SLOT"
+                if current_pos_lvl >= self.level_addition["new level rank"]:  # recall, position ID format is "LVL-SLOT"
                     new_pos_id = str(current_pos_lvl + 1) + "-" + pos_id.split("-")[1]
                     pos.unique_id = new_pos_id
                     new_pos_dict[new_pos_id] = pos
@@ -242,6 +256,48 @@ class VacancyChainAgentBasedModel(Model):
             self.create_position(self.level_addition["new level rank"], new_spot, "vacancy")
         # update model parameters
         self.num_levels, self.vac_trans_mat_num_cols = self.num_levels + 1, self.vac_trans_mat_num_cols + 1
+
+    def remove_level(self):
+        """Remove a level, re-jigging the system to accommodate the loss."""
+        # change retirement and transition matrixes to those given
+        self.act_ret_probs = self.level_removal["updated actor retirement probs"]
+        self.vac_trans_prob_mat = self.level_removal["updated vacancy transition prob matrix"]
+        # transfer actors from the elimination level to the level immediately below, i.e. combine the two levels
+        max_pos_id_of_elimination_level = max([int(pos.split("-")[1]) for pos in self.positions
+                                               if int(pos.split("-")[0]) == self.level_removal["old level rank"]])
+        # change IDs on positions in levels below the new level's rank
+        new_pos_dict = {}
+        for pos_id, pos in self.positions.items():
+            current_pos_lvl = int(pos_id.split("-")[0])
+            # combine the elimination level with the one immediately below it
+            if current_pos_lvl == self.level_removal["old level rank"] + 1:  # recall, position ID format is "LVL-SLOT"
+                new_pos_slot = max_pos_id_of_elimination_level + int(pos_id.split("-")[1])
+                new_pos_id = str(self.level_removal["old level rank"]) + "-" + str(new_pos_slot)
+                pos.unique_id = new_pos_id
+                new_pos_dict[new_pos_id] = pos
+            # the levels further down need to be bumped up
+            elif current_pos_lvl > self.level_removal["old level rank"] + 1:  # position ID format is "LVL-SLOT"
+                new_pos_id = str(current_pos_lvl - 1) + "-" + pos_id.split("-")[1]
+                pos.unique_id = new_pos_id
+                new_pos_dict[new_pos_id] = pos
+            else:
+                new_pos_dict[pos_id] = pos
+        self.positions = new_pos_dict
+        # update agent info to reflect both the level combinations, and the level reassignments
+        for agent in self.schedule.agents:
+            current_agent_lvl = int(agent.position.split("-")[0])
+            if current_agent_lvl == self.level_removal["old level rank"] + 1:
+                new_pos_slot = max_pos_id_of_elimination_level + int(agent.position.split("-")[1])
+                new_agent_positon_id = str(self.level_removal["old level rank"]) + "-" + str(new_pos_slot)
+                agent.position = new_agent_positon_id
+            elif current_agent_lvl > self.level_removal["old level rank"] + 1:
+                new_agent_positon_id = str(current_agent_lvl - 1) + "-" + agent.position.split("-")[1]
+                agent.position = new_agent_positon_id
+        # update system size parameters
+        self.num_levels, self.vac_trans_mat_num_cols = self.num_levels - 1, self.vac_trans_mat_num_cols - 1
+        # including the number of positions per level, to reflect the level combination and reduction
+        rem_lvl, pos_lvl = self.level_removal["old level rank"], self.positions_per_level
+        self.positions_per_level = pos_lvl[:rem_lvl-1] + [pos_lvl[rem_lvl-1] + pos_lvl[rem_lvl]] + pos_lvl[rem_lvl+1:]
 
     def create_position(self, lvl, spot, agent_type):
         """
