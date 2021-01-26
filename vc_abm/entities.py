@@ -101,7 +101,7 @@ class Actor(Mover):
     """
     Class of actors, i.e. those mover agents that occupy positions and retire.
 
-    gender = str, "m" or "f"
+    attribute = int, 1 or 0
 
     moved_this_turn = bool, "True" if the actor moves this turn (either they retire or they're moved around by a
                       vacancy, and "False" otherwise
@@ -109,7 +109,7 @@ class Actor(Mover):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
         self.type = "actor"
-        self.gender = ''
+        self.attr = ''
 
     def step(self):
         """
@@ -204,31 +204,30 @@ class Vacancy(Mover):
         Level 2       0.1         0.4         0.4        0.1
         Level 3       0.05        0.05        0.2        0.7
 
-        Some example of interpretation are "a vacancy in level 1 has a 0.4 probability of moving within level 1", or
-        "a vacancy in level 3 has a probability of 0.1 to retire" or "a vacancy in level 3 has a probability of 0.3 to
+        Some examples of interpretations are "a vacancy in level 1 has a 0.4 probability of moving within level 1", or
+        "a vacancy in level 3 has a probability of 0.1 to retire," or "a vacancy in level 3 has a probability of 0.3 to
         move to level 2".
 
         If we see this matrix referring to a 3-level hierarchy where "1" is the highest level, the above transition
         probability matrix depicts a system where vacancies tend to move down (thereby promoting actors up), stay in
-        their level (thereby encouraging lateral actor moves) and retire (thereby recruiting outside actors).
+        their level (thereby encouraging lateral actor moves), and retire (thereby recruiting outside actors).
 
         NB: this transition probability matrix ONLY depicts movement, i.e. there is no choice for a vacancy to stay put.
 
-        In this model vacancies do not move in "natural time", i.e. in the actor steps. Rather, they move in artificial
-        "vacancy steps." This two-step system is designed so that all vacancy steps will occur in the span of one
-        actor step, i.e. so that a vacancy chain exhausts itself in one unit of natural time. The substantive purpose is
-        to ensure that no positions are vacant for more than one turn, which is reasonable for instance of employment
-        organisations, where a job kept empty for a year will often be abolished. If this 1-actor-step limit is too
-        harsh, we can relax it and allow positions to be vacant for 2, 3, etc. years.
+        In this model vacancies do not move in "natural time", i.e. in the actor steps. Rather, they move in embedded
+        "vacancy steps." This two-step system is designed so that vacancy steps will usually occur in the span of one
+        actor step, i.e. so that a vacancy chain exhausts itself in one unit of natural time. Theoretically, this is
+        meant to approximate the time-embedding assumption of analytic, Markov vacancy chain analysis. Substantively,
+        this coding decision is meant to reflect the fact that positions are very rarely vacant for more than one actor
+        step but that this may happen in cases of ex. a mass purge that opens up too many positions to fill in one year.
 
         Vacancies must coordinate with each other to ensure orderly movement. The rules of vacancy movement are:
         1) vacancies may only move into spots occupied by actors
+        2) vacancies may not move to spots that already feature actor movemement in this step, either because the an
+           actor has just entered that spot or because the actor has already been moved by other vacancies during the
+           current actor step
         2) vacancies may never move an actor that has joined the system in their current actor step
         3) vacancies may never move an actor that has already been moved by other vacancies in their current actor step
-        4) if N>1 vacancies want to move into the same actor-occupied spot, they toss an N-sided die and the winner of
-           the toss gets to move into said spot. All the other ones forfeit this turn of this vacancy movement.
-
-        NB: vacancies have 49 internal steps to move around; they omit every fiftieth step
         """
         if self.model.schedule.steps % self.model.vac_mov_period != 0:
 
@@ -246,11 +245,11 @@ class Vacancy(Mover):
                 # always use information from the immediately preceding actor steps
                 current_actor_step = int(self.model.schedule.steps / self.model.vac_mov_period)
 
-                # assign actor's gender according to the model-provided probability that new recruits are female
-                if random.uniform(0.0, 1.0) <= self.model.prob_fem_entry_per_step[current_actor_step]:
-                    outside_actor.gender = "f"
+                # assign actor's attribute according to the model-provided probability
+                if random.uniform(0.0, 1.0) <= self.model.prob_attr_per_step[current_actor_step]:
+                    outside_actor.attr = 1
                 else:
-                    outside_actor.gender = "m"
+                    outside_actor.attr = 0
 
                 self.retire(outside_actor)
                 return
@@ -262,7 +261,7 @@ class Vacancy(Mover):
                 # get_next_position_info incorporates a random selector
                 desired_positions = [self.get_next_position_info(next_level) for i in range(5)]
 
-                # for each positions, see get information on it and its current occupant
+                # for each positions, get information on it and its current occupant
                 for des_pos in desired_positions:
                     des_pos_occ = des_pos["desired position's occupant"]
 
