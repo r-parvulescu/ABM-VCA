@@ -209,31 +209,33 @@ def get_time_to_retirement_from_last_level(model):
     return retire_time_per_level
 
 
-def get_percent_female_actors(model):
-    """See what percentage of all actors currently in the system are female; pooled and disaggregated by level."""
+def get_percent_attr_actors(model):
+    """
+    See what percentage of all actors currently in the system have the attribute; pooled and disaggregated by level.
+    """
 
-    # initialise a dict of dicts, where first-order keys are levels, and sub-dicts contain counts of men and women
-    # in the respective level. Also add a sub-dict that pools counts across all levels.
-    gend_per_level = {i: {"m": 0., "f": 0.} for i in range(1, model.num_levels + 1)}
+    # initialise a dict of dicts, where first-order keys are levels, and sub-dicts contain counts of 1 and 0 types
+    # in the respective level.
+    attr_per_level = {i: {1: 0., 0: 0.} for i in range(1, model.num_levels + 1)}
 
     # fill the dicts with observed counts
     for agent in model.schedule.agents:
         if agent.type == "actor":
             current_level = int(agent.position.split('-')[0])
-            if agent.gender == "m":
-                gend_per_level[current_level]["m"] += 1.
-            if agent.gender == "f":
-                gend_per_level[current_level]["f"] += 1.
+            if agent.attr == 1:
+                attr_per_level[current_level][1] += 1.
+            if agent.attr == 0:
+                attr_per_level[current_level][0] += 1.
 
-    # turn each count sub-dict into percent female
-    for k, v in gend_per_level.items():
-        total = gend_per_level[k]["f"] + gend_per_level[k]["m"]
+    # turn each count sub-dict into percent 1's
+    for k, v in attr_per_level.items():
+        total = attr_per_level[k][1] + attr_per_level[k][0]
         if total == 0:
-            gend_per_level[k] = 0
+            attr_per_level[k] = 0
         else:
-            gend_per_level[k] = round(gend_per_level[k]["f"] / total, 2) * 100.
+            attr_per_level[k] = round(attr_per_level[k][1] / total, 2) * 100.
 
-    return gend_per_level
+    return attr_per_level
 
 
 def get_percent_actors_from_before_shock(model):
