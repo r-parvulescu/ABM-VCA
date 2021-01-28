@@ -16,10 +16,9 @@ import random
 class VacancyChainAgentBasedModel(Model):
     """"""
 
-    def __init__(self, positions_per_level, actor_retire_probs, vacancy_trans_prob_matrix, firing_schedule,
-                 growth_orders, shrink_orders, level_addition, level_removal, start_fraction_female,
-                 prob_female_entry_per_step, vacancy_benefit_deficit_matrix, data_collector,
-                 shock_step=0, vacancy_move_period=0):
+    def __init__(self, positions_per_level, actor_retire_probs, vac_trans_prob_mat, dismissal_schedule,
+                 growth_orders, shrink_orders, level_addition, level_removal, start_fract_attr,
+                 prob_attr_per_step, vac_ben_def_mat, data_collector, shock_step=0, vac_move_period=0):
         """
         :param positions_per_level: list of ints, of positions per level
                                     e.g. [10,20,30] == 10 positions in level 1, 20 in level 2, 30 in level 3
@@ -28,7 +27,7 @@ class VacancyChainAgentBasedModel(Model):
                                    level. E.g. with [0.3, 0,1, 0.4], each actor in level 1 has a probability of
                                    0,3 of retiring, each actor-step
 
-        :param vacancy_trans_prob_matrix: list of lists, where each sublist is a row of a transition probability
+        :param vac_trans_prob_mat: list of lists, where each sublist is a row of a transition probability
                                           matrix. The vacancy transition probability matrix is a NxN+1 matrix;
                                           N=number of levels and the last column indicates the probability of a vacancy
                                           retiring, i.e. of calling in an actor from outside the system. If e.g. N=3:
@@ -47,12 +46,13 @@ class VacancyChainAgentBasedModel(Model):
                                           hierarchy, so level 1 > 2 > 3
                                           Further details on vacancy movements can be found in entity.vacancy.step
 
-        :param firing_schedule: dict, indicating how actors' retirement probabilities should be changed at the specified
-                                actor-steps. So, e.g. {5: [0.4, 0.4, 0.6], 6: [0.2, 0.2, 0.4]} means that at actor-step
-                                five the retirement probabilities of actors in levels 1, 2, and 3 will be 0.4, 0.4, and
-                                0.6 (respectively), and at actor-step 6 the retirement probabilities of actors in levels
-                                1, 2, and 3 will be 0.2, 0.2, and 0.4, respectively. Besides step five and step six we
-                                use the actor retirement probabilities given by actor_retire_probs.
+        :param dismissal_schedule: dict, indicating how actors' retirement probabilities should be changed at the
+                                   specified actor-steps. So, e.g. {5: [0.4, 0.4, 0.6], 6: [0.2, 0.2, 0.4]} means that
+                                    at actor-step five the retirement probabilities of actors in levels 1, 2, and 3 will
+                                    be 0.4, 0.4, and 0.6 (respectively), and at actor-step 6 the retirement
+                                    probabilities of actors in levels 1, 2, and 3 will be 0.2, 0.2, and 0.4,
+                                    respectively. Besides step five and step six we use the actor retirement
+                                    probabilities given by actor_retire_probs.
 
         :param growth_orders: dict, indicating how many positions should be added to different levels, at the specified
                               actor-steps. So, e.g. {20: [10, 50, 150], 40: [5, 5, 0]} means that at actor-step twenty
@@ -87,10 +87,10 @@ class VacancyChainAgentBasedModel(Model):
                                   multiple levels, either at once or in several steps. This limitation reflects the
                                   extreme rarity and significance of level additions in real systems.
 
-        :param start_fraction_female: float, gender ratio with which we initialise actors at the beginning of the model,
+        :param start_fract_attr: float, gender ratio with which we initialise actors at the beginning of the model,
                                      e.g. 0.6 means that at model initialisation sixty percent of all actors are female
 
-        :param prob_female_entry_per_step: dict, indicating the probability that an actor called from the outside by
+        :param prob_attr_per_step: dict, indicating the probability that an actor called from the outside by
                                            a vacancy retirement will be female, at the designated actor steps. So,
                                            e.g. {20: 0.6, 21: 0.7, 22: 0.7} means that at actor step twenty each
                                            newly-called actor has a probability of 0.6 of being female, while at each
@@ -98,7 +98,7 @@ class VacancyChainAgentBasedModel(Model):
                                            probability of 0.7 of being female.
                                            NB: this dict must be defined for ALL actor-steps of the model
 
-        :param vacancy_benefit_deficit_matrix: changes in some unit associated with vacancy movements. E.g. this matrix
+        :param vac_ben_def_mat: changes in some unit associated with vacancy movements. E.g. this matrix
 
                                                [[1, 2, 3, 4],
                                                 [-1, 3, 4, 5],
@@ -115,7 +115,7 @@ class VacancyChainAgentBasedModel(Model):
         :param shock_step: int, an actor-step at which a shock of particular note occurs, e.g. a major system expansion.
                            By default shock_step == 0.
 
-        :param vacancy_move_period: int, the number of model steps that we give vacancies to work their way out of the
+        :param vac_move_period: int, the number of model steps that we give vacancies to work their way out of the
                                     system. The classic, simplest formulation of vacancy chain analysis assumed that
                                     vacancies make their way out of the system within some natural time unit, like a
                                     year, which here is operationalised as the "actor-step". In model terms, the
@@ -128,15 +128,15 @@ class VacancyChainAgentBasedModel(Model):
         super().__init__()
         # set parameters
         self.num_levels, self.positions_per_level = len(positions_per_level), positions_per_level
-        self.firing_schedule = firing_schedule
+        self.dismissal_schedule = dismissal_schedule
         self.shrink_orders, self.growth_orders = shrink_orders, growth_orders
         self.level_addition, self.level_removal = level_addition, level_removal
-        self.start_fraction_fem, self.prob_fem_entry_per_step = start_fraction_female, prob_female_entry_per_step
-        self.act_ret_probs, self.vac_trans_prob_mat = actor_retire_probs, vacancy_trans_prob_matrix
-        self.vac_trans_mat_num_cols = len(vacancy_trans_prob_matrix[0])
-        self.vac_ben_def_mat = vacancy_benefit_deficit_matrix
+        self.start_fract_attr, self.prob_attr_per_step = start_fract_attr, prob_attr_per_step
+        self.act_ret_probs, self.vac_trans_prob_mat = actor_retire_probs, vac_trans_prob_mat
+        self.vac_trans_mat_num_cols = len(vac_trans_prob_mat[0])
+        self.vac_ben_def_mat = vac_ben_def_mat
         self.data_collector = DataCollector(model_reporters=data_collector)
-        self.shock_step, self.vac_mov_period = shock_step, vacancy_move_period
+        self.shock_step, self.vac_mov_period = shock_step, vac_move_period
 
         # define the scheduler
         self.schedule = time.RandomActivation(self)
@@ -150,6 +150,9 @@ class VacancyChainAgentBasedModel(Model):
         for lvl in range(self.num_levels):
             for spot in range(self.positions_per_level[lvl]):
                 self.create_position(lvl + 1, spot + 1, "actor")  # +1 in order to 1-index the positions codes
+
+        # TODO: make actor, vacancy and position retirement lists that don’t refresh at each actor step, that just grow,
+        #      so we can estimate at any point how many such entities were ever in the system
 
     def step(self):
         """Make vacancies and actors move."""
@@ -183,9 +186,9 @@ class VacancyChainAgentBasedModel(Model):
             self.remove_level()
 
         # if there are firing orders, make actors move according to them
-        if current_actor_step in self.firing_schedule:
+        if current_actor_step in self.dismissal_schedule:
             baseline_act_ret_prob = self.act_ret_probs  # save baseline actor retirement probabilities
-            self.act_ret_probs = self.firing_schedule[current_actor_step]  # set new ret probs
+            self.act_ret_probs = self.dismissal_schedule[current_actor_step]  # set new ret probs
             self.schedule.step()  # make actors move
             self.act_ret_probs = baseline_act_ret_prob  # return to baseline actor retirement probabilities
         else:  # make agents (actors and vacancies both) move, for all other cases except level removal
@@ -297,7 +300,8 @@ class VacancyChainAgentBasedModel(Model):
         self.num_levels, self.vac_trans_mat_num_cols = self.num_levels - 1, self.vac_trans_mat_num_cols - 1
         # including the number of positions per level, to reflect the level combination and reduction
         rem_lvl, pos_lvl = self.level_removal["old level rank"], self.positions_per_level
-        self.positions_per_level = pos_lvl[:rem_lvl-1] + [pos_lvl[rem_lvl-1] + pos_lvl[rem_lvl]] + pos_lvl[rem_lvl+1:]
+        self.positions_per_level = pos_lvl[:rem_lvl - 1] + [pos_lvl[rem_lvl - 1] + pos_lvl[rem_lvl]] + pos_lvl[
+                                                                                                       rem_lvl + 1:]
 
     def create_position(self, lvl, spot, agent_type):
         """
@@ -314,7 +318,7 @@ class VacancyChainAgentBasedModel(Model):
         # create new moving agent and add it to the scheduler
         new_agent = Vacancy(uuid.uuid4(), self) if agent_type == "vacancy" else Actor(uuid.uuid4(), self)
         if agent_type == "actor":
-            new_agent.gender = "f" if bool(np.random.binomial(1, self.start_fraction_fem)) else "m"
+            new_agent.gender = 1 if bool(np.random.binomial(1, self.start_fract_attr)) else 0
             # to avoid clumpy cohort effects and therefore the number of burn-in steps, give each actor a random career
             # age of 10-22, since these are the equilibrium career ages per level; this way the "start" of the system
             # is smoother
