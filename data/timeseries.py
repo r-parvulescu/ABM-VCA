@@ -2,6 +2,7 @@
 Functions for plotting per-step means and standard deviations of metrics from batchruns of VacancyChainAgentBasedModel.
 """
 
+import gc
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
@@ -257,12 +258,12 @@ def plot_mean_line(metric_name, line_name, mean_line, stdev_line, colour_counter
         plt.fill_between(x, stdev_lowbound, stdev_highbound, color=colours[colour_counter][0], alpha=0.2)
 
 
-def save_figure(metric_name, batchrun, out_dir, level_names, experiment_names, shock_step=0, fig_title='',
+def save_figure(metric_name, batchrun, out_dir, level_names, experiment_names=None, shock_step=0, fig_title='',
                 burn_in_steps=0):
     """Complete a figure with titles, legend, extra line-markers and grid, then saves the figure to disk."""
 
     y_axis_labels = {"average_career_length": "actor steps", "average_vacancy_chain_length": "positions",
-                     "percent_female_actors": "percent", "percent_actors_from_before_shock": "percent",
+                     "percent_attr_actors": "percent", "percent_actors_from_before_shock": "percent",
                      "count_vacancies_still_in_system": "count", "count_vacancies_per_step": "count",
                      "actor_counts": "count", "agent_sets_sizes": "count",
                      "actor_turnover_rate": "actor turnover per position",
@@ -295,19 +296,27 @@ def save_figure(metric_name, batchrun, out_dir, level_names, experiment_names, s
     colours = ['r', 'b', 'g', 'k', 'y', 'c', 'm']
     lgnd1_lines = [Line2D([0], [0], c=colours[i], lw=2, ls="-") for i in range(len(level_names))]
     ncol_colours = 1 if len(level_names) <= 3 else 2
-    # NB: I'm being risky here since the level come as dict values and I'm just list-ing the values so in principle
-    # this could scramble up their order and mislabel the legend lines, but in practice it never does; still, risky
-    color_legend = plt.legend(lgnd1_lines, list(level_names.values()), loc='upper right', bbox_to_anchor=(1.1, -0.09),
-                              ncol=ncol_colours)
-    plt.gca().add_artist(color_legend)
+    # if there are multiple cases/experiments, put the level legend on the left
+    if experiment_names:
+        # NB: I'm being risky here since the level come as dict values and I'm just list-ing the values so in principle
+        # this could scramble up their order and mislabel the legend lines, but in practice it never does; still, risky
+        color_legend = plt.legend(lgnd1_lines, list(level_names.values()), loc='upper right',
+                                  bbox_to_anchor=(1.1, -0.09), ncol=ncol_colours)
+        plt.gca().add_artist(color_legend)
+    else:  # if there's only one case/experiment, center the line legend
+        color_legend = plt.legend(lgnd1_lines, list(level_names.values()),
+                                  loc='upper right', bbox_to_anchor=(0.8, -0.09), ncol=ncol_colours)
+        plt.gca().add_artist(color_legend)
 
-    # add another legend for linestyles, where each style indicates a different simulation case
-    linestyles = ['-', '--', ':', '-.']
-    lgnd2_lines = [Line2D([0], [0], c='k', lw=2, ls=linestyles[i]) for i in range(len(experiment_names))]
-    ncol_exp_cases = 1 if len(experiment_names) <= 3 else 2
-    linestyle_legend = plt.legend(lgnd2_lines, experiment_names, loc='upper left', bbox_to_anchor=(-0.1, -0.09),
-                                  ncol=ncol_exp_cases)
-    plt.gca().add_artist(linestyle_legend)
+    # if there are different simulation cases/experiments, add another legend for linestyles, where each style
+    # indicates a different simulation case
+    if experiment_names:
+        linestyles = ['-', '--', ':', '-.']
+        lgnd2_lines = [Line2D([0], [0], c='k', lw=2, ls=linestyles[i]) for i in range(len(experiment_names))]
+        ncol_exp_cases = 1 if len(experiment_names) <= 3 else 2
+        linestyle_legend = plt.legend(lgnd2_lines, experiment_names, loc='upper left', bbox_to_anchor=(-0.1, -0.09),
+                                      ncol=ncol_exp_cases)
+        plt.gca().add_artist(linestyle_legend)
 
     # add label the x and y axes, add gridlines
     plt.xlabel("actor steps")
@@ -318,5 +327,5 @@ def save_figure(metric_name, batchrun, out_dir, level_names, experiment_names, s
     iterations, steps = str(batchrun.iterations), str(batchrun.max_steps)
     figure_filename = out_dir + metric_name + "_" + iterations + "runs_" + steps + "steps.png"
     plt.savefig(figure_filename)
-
     plt.close()
+    gc.collect()  # so I don't have MemoryError pile-ups because this ultimately bad code...
