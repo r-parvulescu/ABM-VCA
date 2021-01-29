@@ -3,7 +3,7 @@ Functions for making tables based on equilibrium, post-burn-in model behaviour o
 of VacancyChainAgentBasedModel.
 """
 
-from data import helpers, collector
+from observe import helpers, collector
 import numpy as np
 import csv
 
@@ -39,7 +39,8 @@ def make_convergence_table(batchruns, measures, out_dir, vacancy_transition_prob
                 vals[idx][measure_name]["stdev"][line_name] = np.mean(mean_stdev[1])
 
     # save table to disk
-    with open(out_dir + "equilibrium_values.csv", "w") as out_f:
+    iterations, steps = str(batchruns[0].iterations), str(batchruns[0].max_steps)
+    with open(out_dir + iterations + "runs_" + steps + "_steps_equilibrium_values.csv", "w") as out_f:
         writer = csv.writer(out_f)
         writer.writerow(["Batchrun", "Measure Name", "Mean or StDev", "Level", "Value"])
         for br in vals:
