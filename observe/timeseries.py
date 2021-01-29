@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
-from data import helpers
+from observe import helpers
 
 
 def make_time_series_figures(batchruns, out_dir, level_names, experiment_names, burn_in_steps=0, shock_step=0,

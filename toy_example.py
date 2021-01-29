@@ -1,12 +1,12 @@
 """Example of ABM-VCA implementation using toy data."""
 
-from vc_abm import model, batchrun
-from data import collector, timeseries, convergence
+from wcs import model, batchrun
+from observe import collector, timeseries, convergence
 from local import out_dir
 
 total_actor_steps = 100
 burn_in_steps = 40
-iterations = 50
+iterations = 1
 
 figure_title = "Toy Example"
 experiment_names = ["no dismissals", "with dismissals"]

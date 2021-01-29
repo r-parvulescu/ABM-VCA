@@ -7,7 +7,7 @@ Author of Python Code:
 
 from mesa import Model, time
 from mesa.datacollection import DataCollector
-from vc_abm.entities import Actor, Position, Vacancy
+from wcs.entities import Actor, Position, Vacancy
 import numpy as np
 import uuid
 import random
